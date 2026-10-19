@@ -1,6 +1,6 @@
 import React from 'react';
 import { Cpu, ExternalLink } from 'lucide-react';
-import { IICLogo, AcmNitkLogo, VidyutLogo, EngineerNitkLogo, ArcesiumLogo } from './BrandLogos';
+import { IICLogo, AcmNitkLogo, AcmDiamondLogo, VidyutLogo, EngineerNitkLogo, ArcesiumLogo } from './BrandLogos';
 
 export const Footer = () => {
   return (
@@ -54,16 +54,18 @@ export const Footer = () => {
             Host Organizations
           </div>
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <img src="/assets/acm_nitk_logo.png" alt="ACM NITK" className="w-5 h-5 object-contain" />
+            <div className="flex items-center gap-2.5">
+              <AcmDiamondLogo className="w-5 h-5 shrink-0" />
               <span className="text-zinc-300 font-medium">ACM NITK Student Chapter</span>
             </div>
             <div className="flex items-center gap-2">
               <img src="/assets/engi.png" alt="Engineer '26" className="w-5 h-5 object-contain rounded-sm" />
-              <span className="text-amber-300 font-medium">Engineer '26 &bull; NITK Fest</span>
+              <span className="text-white font-engineer font-bold text-xs tracking-wider">ENGINEER '26</span>
             </div>
             <div className="flex items-center gap-2">
-              <img src="/assets/vidyut_logo.png" alt="Vidyut SIG" className="w-5 h-5 object-contain" />
+              <div className="w-5 h-5 rounded bg-[#16171b] border border-[#25272e] flex items-center justify-center text-[10px] text-[#00e5ff]">
+                ⚡
+              </div>
               <span className="text-zinc-300 font-medium">ACM Vidyut SIG</span>
             </div>
           </div>

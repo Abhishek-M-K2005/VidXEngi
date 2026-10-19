@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   ExternalLink
 } from 'lucide-react';
+import { AcmNitkLogo, ArcesiumLogo, EngineerNitkLogo } from './BrandLogos';
+import { DynamicElectricTitle } from './DynamicElectricTitle';
 
 export const HeroBanner = ({
   activeTeam,
@@ -46,56 +48,73 @@ export const HeroBanner = ({
   return (
     <section className="relative overflow-hidden bg-[#0a0b0d] border-b border-[#1a1b1f]">
       
-      {/* ── BACKGROUND LAYER: Clean Circuit Chip Art ── */}
+      {/* ── BACKGROUND LAYER: Dark Matte Circuit Accent ── */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none">
-        <div
-          className="absolute inset-0 bg-cover bg-top opacity-35 filter contrast-125"
-          style={{ backgroundImage: "url('/assets/clean_circuit_chip.png')" }}
-        />
-        {/* Matte Vignette Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0b0d]/70 via-[#0a0b0d]/50 to-[#0a0b0d]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0b0d]/90 via-transparent to-[#0a0b0d]/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0e0f13] via-[#0a0b0d] to-[#0a0b0d]" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-[#00e5ff]/[0.02] rounded-full blur-[100px]" />
       </div>
 
       {/* ── MAIN CONTENT ── */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-14 text-center">
 
-        {/* 1. OFFICIAL LOGO ROW MATCHING POSTER */}
-        <div className="flex flex-wrap items-center justify-between gap-4 p-3 sm:px-6 sm:py-3 rounded-2xl bg-[#111215]/85 border border-[#1f2127] mb-8 backdrop-blur-md">
-          {/* Left: IIC & ACM NITK Chapter */}
-          <div className="flex items-center gap-3 sm:gap-6">
-            <a href="https://www.mic.gov.in" target="_blank" rel="noreferrer" title="Institution's Innovation Council">
-              <img src="/assets/iic_nav.png" alt="IIC Logo" className="h-6 sm:h-7 object-contain" />
-            </a>
-            <div className="h-5 w-px bg-[#26282e] hidden sm:block" />
-            <a href="https://acm.nitk.ac.in" target="_blank" rel="noreferrer" title="ACM NITK Student Chapter">
-              <img src="/assets/acm_nitk_nav.png" alt="ACM NITK Student Chapter" className="h-6 sm:h-7 object-contain" />
+        {/* ── HEADER STACK: TITLE SPONSOR & CO-HOST PRESENTERS ── */}
+        <div className="flex flex-col items-center justify-center mb-8 gap-4">
+
+          {/* 1. TITLE SPONSOR ROW */}
+          <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#111215]/80 border border-[#1e2026] backdrop-blur-md">
+            <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 font-medium">
+              Title Sponsor
+            </span>
+            <div className="h-3 w-px bg-[#26282e]" />
+            <a
+              href="https://www.arcesium.com"
+              target="_blank"
+              rel="noreferrer"
+              title="Arcesium Title Sponsor"
+              className="hover:opacity-90 transition flex items-center"
+            >
+              <ArcesiumLogo className="h-5 sm:h-6" />
             </a>
           </div>
 
-          {/* Right: Arcesium & Engineer '26 */}
-          <div className="flex items-center gap-3 sm:gap-6">
-            <a href="https://www.arcesium.com" target="_blank" rel="noreferrer" title="Arcesium Title Sponsor">
-              <img src="/assets/arcesium_nav.png" alt="Arcesium" className="h-6 sm:h-7 object-contain" />
+          {/* 2. ACM LOGO X ENGINEER LOGO NITK PRESENTS */}
+          <div className="inline-flex flex-wrap items-center justify-center gap-3.5 sm:gap-5 px-5 sm:px-7 py-2.5 sm:py-3 rounded-2xl bg-[#111215]/90 border border-[#22242a] backdrop-blur-md shadow-xl shadow-black/50">
+            <a
+              href="https://acm.nitk.ac.in"
+              target="_blank"
+              rel="noreferrer"
+              title="ACM NITK Student Chapter"
+              className="hover:opacity-95 transition flex items-center shrink-0"
+            >
+              <AcmNitkLogo size="normal" />
             </a>
-            <div className="h-5 w-px bg-[#26282e] hidden sm:block" />
-            <a href="https://engineer.nitk.ac.in" target="_blank" rel="noreferrer" title="Engineer '26 NITK">
-              <img src="/assets/vidyut_crest_nav.png" alt="Engineer '26 NITK" className="h-7 sm:h-8 object-contain" />
+
+            <span className="text-zinc-500 font-light text-2xl sm:text-3xl select-none shrink-0 leading-none px-0.5">
+              ✕
+            </span>
+
+            <a
+              href="https://engineer.nitk.ac.in"
+              target="_blank"
+              rel="noreferrer"
+              title="Engineer '26 NITK"
+              className="hover:opacity-95 transition flex items-center shrink-0"
+            >
+              <EngineerNitkLogo size="normal" />
             </a>
+
+            <div className="h-6 w-px bg-[#26282e] hidden sm:block shrink-0 mx-1" />
+
+            <span className="text-xs sm:text-sm font-mono tracking-[0.16em] text-zinc-300 font-medium uppercase shrink-0">
+              NITK presents
+            </span>
           </div>
+
         </div>
 
-        {/* 2. OVER-TITLE BADGE */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#131417] border border-[#22242a] text-zinc-300 text-xs sm:text-sm font-medium mb-5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff]" />
-          <span>ACM NITK Vidyuth × Engineer NITK '26 presents</span>
-        </div>
-
-        {/* 3. HERO HEADLINE */}
-        <div className="mb-3 select-none">
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black font-display tracking-tight text-white leading-none">
-            VERILOG <span className="text-[#00e5ff]">QUEST</span>
-          </h1>
+        {/* 3. ELECTRICALLY DYNAMIC HERO HEADLINE */}
+        <div className="mb-2 select-none">
+          <DynamicElectricTitle />
         </div>
 
         {/* 4. SUBTITLE */}
@@ -242,12 +261,21 @@ export const HeroBanner = ({
               </button>
             </div>
             
-            <div className="p-2 bg-black max-h-[75vh] overflow-y-auto flex items-center justify-center">
-              <img
-                src="/assets/poster_original.png"
-                alt="Verilog Quest Official Poster"
-                className="max-h-[68vh] object-contain rounded"
-              />
+            <div className="p-8 bg-black/60 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#18191d] border border-[#2b2d35] flex items-center justify-center text-3xl">
+                ⚡
+              </div>
+              <div>
+                <h4 className="text-xl font-bold font-display text-white">VERILOG QUEST '26</h4>
+                <p className="text-sm text-zinc-400 font-mono mt-1">RTL × FPGA Hardware Challenge</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-mono text-zinc-300 pt-2">
+                <span>Date: 25/10/2026</span>
+                <span>&bull;</span>
+                <span>NITK Surathkal</span>
+                <span>&bull;</span>
+                <span className="text-amber-400">17.5K INR</span>
+              </div>
             </div>
 
             <div className="p-3 bg-[#111215] border-t border-[#1e2025] flex items-center justify-between text-xs text-zinc-400">
@@ -255,13 +283,9 @@ export const HeroBanner = ({
                 <QrCode className="w-4 h-4 text-amber-400" />
                 <span>Register before the 23rd!</span>
               </div>
-              <a
-                href="/assets/poster_original.png"
-                download="VerilogQuest_NITK_Poster.png"
-                className="text-[#00e5ff] hover:underline font-semibold"
-              >
-                Download Poster
-              </a>
+              <span className="text-[#00e5ff] font-semibold font-mono">
+                ACM Vidyut × Engineer '26
+              </span>
             </div>
           </div>
         </div>

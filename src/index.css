@@ -2,204 +2,258 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============================================================
-   DARK MATTE LUXE DESIGN SYSTEM
-   Deep Pitch Carbon + Muted Graphite + Crisp White Typography
-   ============================================================ */
-:root {
-  color-scheme: dark;
-  --mouse-x: 50%;
-  --mouse-y: 50%;
-
-  /* Dark Matte Base */
-  --bg-matte:       #0a0b0d;
-  --bg-card:        #121316;
-  --bg-card-hover:  #16171b;
-  --border-subtle:  #1e2025;
-  --border-medium:  #2a2c33;
-  --border-accent:  #00e5ff;
-
-  /* Text System */
-  --text-primary:   #f4f5f7;
-  --text-secondary: #9da3af;
-  --text-tertiary:  #636874;
-
-  /* Accents */
-  --cyan:           #00e5ff;
-  --amber:          #fbbf24;
-  --emerald:        #10b981;
+/* --- Official Electric Poster Font: Anurati --- */
+@font-face {
+  font-family: 'Anurati';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/src/assets/fonts/Anurati-Regular.woff') format('woff'),
+       url('https://fonts.cdnfonts.com/s/14024/Anurati-Regular.woff') format('woff');
 }
 
-@media (pointer: fine) {
-  body, button, a, input, select, textarea {
-    cursor: none !important;
-  }
+/* --- Global Digital Theme Variables --- */
+:root {
+  --bg-deep: #05050A;
+  --bg-darker: #020205;
+  --neon-cyan: #00F0FF;
+  --neon-cyan-dim: rgba(0, 240, 255, 0.2);
+  --glass-bg: rgba(15, 15, 25, 0.55);
+  --glass-border: rgba(0, 240, 255, 0.15);
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: var(--bg-matte);
-  color: var(--text-primary);
+  padding: 0;
+  background-color: var(--bg-deep);
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, sans-serif;
   overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #0a0b0d;
+  background: var(--bg-deep);
 }
+
 ::-webkit-scrollbar-thumb {
   background: #202227;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #2e3138;
+  background: var(--neon-cyan);
 }
 
-/* ============================================================
-   TYPOGRAPHY FAMILIES
-   ============================================================ */
-.font-display {
+.digital-canvas {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Frosted Glass Navigation --- */
+.glass-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 4rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.nav-links button {
+  background: none;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.nav-links button:hover,
+.text-neon-cyan {
+  color: var(--neon-cyan) !important;
+  text-shadow: 0 0 12px var(--neon-cyan-dim);
+}
+
+/* --- Immersive Hero Section --- */
+.hero-section {
+  position: relative;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding-top: 80px;
+}
+
+.hero-bg-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.hero-circuit {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0.25;
+}
+
+.hero-gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, transparent 0%, var(--bg-deep) 90%);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.glitch-title {
+  font-size: 5.5rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: 6px;
+  color: #fff;
+  text-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
   font-family: 'Syne', sans-serif;
 }
-.font-stencil {
-  font-family: 'Space Grotesk', sans-serif;
-}
-.font-code {
-  font-family: 'JetBrains Mono', monospace;
-}
 
-/* ============================================================
-   CARD SURFACES
-   ============================================================ */
-.matte-card {
-  background: #111215;
-  border: 1px solid #1e2025;
-  border-radius: 14px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.matte-card:hover {
-  background: #15161a;
-  border-color: #2a2c34;
-}
-
-.matte-card-active {
-  background: #131518;
-  border: 1.5px solid #00e5ff;
-  border-radius: 14px;
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.1);
-}
-
-.matte-card-solved {
-  background: #101416;
-  border: 1px solid rgba(0, 229, 255, 0.3);
-  border-radius: 14px;
-}
-
-/* Spotlight Card effect */
-.spotlight-card {
-  position: relative;
-  overflow: hidden;
-}
-.spotlight-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(
-    380px circle at var(--card-mouse-x, 50%) var(--card-mouse-y, 50%),
-    rgba(255, 255, 255, 0.04),
-    transparent 65%
-  );
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  z-index: 0;
-}
-.spotlight-card:hover::before {
-  opacity: 1;
-}
-
-/* ============================================================
-   BUTTONS
-   ============================================================ */
-.btn-matte-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 22px;
-  border-radius: 9px;
-  background: #00e5ff;
-  color: #08090a;
-  font-weight: 800;
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
+.hero-subtitle {
+  font-size: 1.5rem;
+  color: var(--neon-cyan);
+  letter-spacing: 3px;
   text-transform: uppercase;
-  transition: all 0.15s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-.btn-matte-primary:hover {
-  background: #33ebff;
-  transform: translateY(-1px);
-}
-.btn-matte-primary:active {
-  transform: scale(0.98);
-}
-
-.btn-matte-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 9px;
-  border: 1px solid #23252b;
-  background: #131417;
-  color: #e5e7eb;
-  font-weight: 600;
-  font-size: 0.8125rem;
-  transition: all 0.15s ease;
-}
-.btn-matte-ghost:hover {
-  background: #1a1c21;
-  border-color: #343740;
-  color: #ffffff;
-}
-
-/* Code block */
-.code-block-matte {
-  background: #090a0c;
-  border: 1px solid #1a1b1f;
-  border-radius: 10px;
+  margin-top: 0.5rem;
+  font-weight: 300;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8125rem;
-  line-height: 1.65;
-  color: #e5e7eb;
 }
 
-/* Shaking animation for incorrect password */
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
-}
-.animate-shake {
-  animation: shake 0.35s ease;
+/* --- Glass Cards --- */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
-.scrollbar-none {
-  scrollbar-width: none;
-}
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+/* --- Interactive Neon Glows --- */
+.glow-hover {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.glow-hover:hover {
+  filter: drop-shadow(0 0 20px rgba(0, 240, 255, 0.8));
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* --- Cybernetic Buttons --- */
+.cyber-btn {
+  background: transparent;
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  padding: 0.8rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px var(--neon-cyan-dim);
+}
+
+.cyber-btn.primary {
+  background: var(--neon-cyan);
+  color: var(--bg-deep);
+}
+
+.cyber-btn:hover {
+  background: var(--neon-cyan);
+  color: var(--bg-deep);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.6);
+  transform: scale(1.05);
+}
+
+/* --- Footer --- */
+.cyber-footer {
+  text-align: center;
+  padding: 3rem 2rem;
+  background-color: var(--bg-deep);
+  border-top: 1px solid var(--glass-border);
+  z-index: 10;
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+  .glitch-title {
+    font-size: 3.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .glass-nav {
+    padding: 1rem 2rem;
+  }
+}
+
+/* ============================================================
+   EMERGENCY FAILSAFE: CONSTRAIN MASSIVE LOGOS
+   ============================================================ */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Force all header, nav, and sponsor logos to behave */
+a img,
+nav img,
+header img,
+.partner-logo {
+  max-height: 35px !important;
+  width: auto !important;
+  object-fit: contain;
+}
+
+/* Except the background circuit image, which needs to fill the space */
+img.hero-circuit {
+  max-height: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}

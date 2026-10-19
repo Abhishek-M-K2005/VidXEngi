@@ -236,7 +236,7 @@ export const App = () => {
     }, 150);
   };
 
-  // Live Competition Simulation Mode (Simulates competing teams making progress)
+  // Live Competition Simulation Mode
   useEffect(() => {
     if (!isSimulating) return;
 
@@ -287,11 +287,11 @@ export const App = () => {
   }, [isSimulating, teams, activeTeamId]);
 
   return (
-    <div className="min-h-screen bg-[#0c0d0e] text-zinc-100 flex flex-col relative selection:bg-[#00e5ff] selection:text-black">
+    <div className="digital-canvas relative selection:bg-[#00F0FF] selection:text-black">
       {/* Background Interactive Electric Canvas */}
       <ElectricCanvas />
 
-      {/* Custom Tactical HUD Cursor Reticle (Matching User Reference Image) */}
+      {/* Custom Tactical HUD Cursor Reticle */}
       <CyberCursor />
 
       {/* Main App Navigation */}
@@ -318,7 +318,7 @@ export const App = () => {
       />
 
       {/* Dynamic Tab Views */}
-      <main className="flex-1 relative z-10">
+      <main className="flex-1 relative z-10 w-full max-w-7xl mx-auto pt-8 pb-16">
         {currentTab === 'puzzles' && (
           <PuzzleStageList
             puzzles={PUZZLES}
@@ -376,10 +376,10 @@ export const App = () => {
         onRegister={handleRegisterTeam}
       />
 
-      {/* Floating Toast Notification */}
+      {/* Floating Toast Notification - Upgraded to Glassmorphism */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-[#16171b] border border-[#2a2d35] text-xs font-mono text-zinc-200 shadow-2xl backdrop-blur-md flex items-center gap-3 animate-bounce">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#00e5ff] animate-ping"></span>
+        <div className="fixed bottom-5 right-5 z-50 p-4 rounded-xl bg-[rgba(15,15,25,0.75)] backdrop-blur-xl border border-[rgba(0,240,255,0.25)] text-xs font-mono text-[#F8FAFC] shadow-[0_0_25px_rgba(0,240,255,0.3)] flex items-center gap-3 animate-bounce glow-hover">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#00F0FF] shadow-[0_0_8px_#00F0FF] animate-pulse"></span>
           <span>{toastMessage}</span>
         </div>
       )}

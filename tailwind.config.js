@@ -23,6 +23,12 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+        chakra: ['"Chakra Petch"', 'sans-serif'],
+        engineer: ['"Chakra Petch"', 'sans-serif'],
+        orbitron: ['"Orbitron"', 'sans-serif'],
+        mecha: ['"Orbitron"', '"Chakra Petch"', 'sans-serif'],
+        anurati: ['"Anurati"', 'sans-serif'],
+        electric: ['"Anurati"', 'sans-serif'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

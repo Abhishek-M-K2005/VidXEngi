@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   DARK MATTE LUXE DESIGN SYSTEM
+   Deep Pitch Carbon + Muted Graphite + Crisp White Typography
+   ============================================================ */
+:root {
+  color-scheme: dark;
+  --mouse-x: 50%;
+  --mouse-y: 50%;
+
+  /* Dark Matte Base */
+  --bg-matte:       #0a0b0d;
+  --bg-card:        #121316;
+  --bg-card-hover:  #16171b;
+  --border-subtle:  #1e2025;
+  --border-medium:  #2a2c33;
+  --border-accent:  #00e5ff;
+
+  /* Text System */
+  --text-primary:   #f4f5f7;
+  --text-secondary: #9da3af;
+  --text-tertiary:  #636874;
+
+  /* Accents */
+  --cyan:           #00e5ff;
+  --amber:          #fbbf24;
+  --emerald:        #10b981;
+}
+
+@media (pointer: fine) {
+  body, button, a, input, select, textarea {
+    cursor: none !important;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-matte);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0b0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #202227;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2e3138;
+}
+
+/* ============================================================
+   TYPOGRAPHY FAMILIES
+   ============================================================ */
+.font-display {
+  font-family: 'Syne', sans-serif;
+}
+.font-stencil {
+  font-family: 'Space Grotesk', sans-serif;
+}
+.font-code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ============================================================
+   CARD SURFACES
+   ============================================================ */
+.matte-card {
+  background: #111215;
+  border: 1px solid #1e2025;
+  border-radius: 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.matte-card:hover {
+  background: #15161a;
+  border-color: #2a2c34;
+}
+
+.matte-card-active {
+  background: #131518;
+  border: 1.5px solid #00e5ff;
+  border-radius: 14px;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.1);
+}
+
+.matte-card-solved {
+  background: #101416;
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 14px;
+}
+
+/* Spotlight Card effect */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    380px circle at var(--card-mouse-x, 50%) var(--card-mouse-y, 50%),
+    rgba(255, 255, 255, 0.04),
+    transparent 65%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 0;
+}
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-matte-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 9px;
+  background: #00e5ff;
+  color: #08090a;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.btn-matte-primary:hover {
+  background: #33ebff;
+  transform: translateY(-1px);
+}
+.btn-matte-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-matte-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: 1px solid #23252b;
+  background: #131417;
+  color: #e5e7eb;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  transition: all 0.15s ease;
+}
+.btn-matte-ghost:hover {
+  background: #1a1c21;
+  border-color: #343740;
+  color: #ffffff;
+}
+
+/* Code block */
+.code-block-matte {
+  background: #090a0c;
+  border: 1px solid #1a1b1f;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: #e5e7eb;
+}
+
+/* Shaking animation for incorrect password */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.animate-shake {
+  animation: shake 0.35s ease;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+

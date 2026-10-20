@@ -13,13 +13,16 @@ export const LeaderboardView = ({
   const [searchTeam, setSearchTeam] = useState('');
   const [selectedCollege, setSelectedCollege] = useState('ALL');
 
-  const sortedTeams = [...teams].sort((a, b) => {
+  // Only competing student teams appear on the public leaderboard
+  const competingTeams = teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut');
+
+  const sortedTeams = [...competingTeams].sort((a, b) => {
     if (b.solvedPuzzles.length !== a.solvedPuzzles.length) return b.solvedPuzzles.length - a.solvedPuzzles.length;
     if (b.score !== a.score) return b.score - a.score;
     return a.penaltyMinutes - b.penaltyMinutes;
   });
 
-  const colleges = ['ALL', ...Array.from(new Set(teams.map((t) => t.college)))];
+  const colleges = ['ALL', ...Array.from(new Set(competingTeams.map((t) => t.college)))];
 
   const filteredTeams = sortedTeams.filter((t) => {
     const matchesSearch =
@@ -89,32 +92,44 @@ export const LeaderboardView = ({
         </button>
       </div>
 
-      {/* ── Podium Cards for Top 3 ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {sortedTeams.slice(0, 3).map((team, idx) => (
-          <div
-            key={team.id}
-            className={`p-5 rounded-xl border matte-card relative overflow-hidden ${
-              idx === 0
-                ? '!border-amber-500/40 !bg-[#1c1a14]'
-                : idx === 1
-                ? '!border-zinc-500/30 !bg-[#18191d]'
-                : '!border-amber-800/30 !bg-[#191614]'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-2xl">{MEDAL[idx]}</span>
-              <span className="text-2xl">{team.avatarSeed}</span>
-            </div>
-            <h4 className="text-base font-extrabold text-white truncate">{team.name}</h4>
-            <p className="text-xs text-zinc-400 truncate mb-4">{team.college}</p>
-            <div className="pt-3 border-t border-[#23252a] flex items-center justify-between text-xs font-mono">
-              <span className="text-zinc-400">Solved: <strong className="text-[#00e5ff]">{team.solvedPuzzles.length}/10</strong></span>
-              <span className="text-amber-400 font-bold">{team.score.toLocaleString()} pts</span>
-            </div>
+      {/* ── Podium Cards for Top 3 (or Empty State) ── */}
+      {sortedTeams.length === 0 ? (
+        <div className="p-10 rounded-2xl bg-[#121316] border border-[#202228] text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+            <Trophy className="w-6 h-6" />
           </div>
-        ))}
-      </div>
+          <h3 className="text-base font-bold text-white">Standings Matrix Ready</h3>
+          <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
+            No competing teams have been provisioned yet. The official leaderboard will automatically populate as teams are authorized by ACM Vidyut administrators and begin solving hardware stages.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {sortedTeams.slice(0, 3).map((team, idx) => (
+            <div
+              key={team.id}
+              className={`p-5 rounded-xl border matte-card relative overflow-hidden ${
+                idx === 0
+                  ? '!border-amber-500/40 !bg-[#1c1a14]'
+                  : idx === 1
+                  ? '!border-zinc-500/30 !bg-[#18191d]'
+                  : '!border-amber-800/30 !bg-[#191614]'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-2xl">{MEDAL[idx]}</span>
+                <span className="text-2xl">{team.avatarSeed}</span>
+              </div>
+              <h4 className="text-base font-extrabold text-white truncate">{team.name}</h4>
+              <p className="text-xs text-zinc-400 truncate mb-4">{team.college}</p>
+              <div className="pt-3 border-t border-[#23252a] flex items-center justify-between text-xs font-mono">
+                <span className="text-zinc-400">Solved: <strong className="text-[#00e5ff]">{team.solvedPuzzles.length}/10</strong></span>
+                <span className="text-amber-400 font-bold">{team.score.toLocaleString()} pts</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Filter & Search Bar ── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">

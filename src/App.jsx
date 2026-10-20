@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PUZZLES } from './data/puzzles';
-import { INITIAL_TEAMS, INITIAL_ACTIVITY_LOGS } from './data/teams';
+import { INITIAL_TEAMS, INITIAL_ACTIVITY_LOGS, ADMIN_TEAM } from './data/teams';
 import { soundFx } from './utils/sound';
 
 import { ElectricCanvas } from './components/ElectricCanvas';
@@ -13,32 +13,62 @@ import { FinalProblemView } from './components/FinalProblemView';
 import { LiveAnalysisView } from './components/LiveAnalysisView';
 import { RulesView } from './components/RulesView';
 import { AuthModal } from './components/AuthModal';
+import { SessionCollisionModal } from './components/SessionCollisionModal';
 import { Footer } from './components/Footer';
+import { sessionManager } from './utils/sessionManager';
 
 export const App = () => {
   const [currentTab, setCurrentTab] = useState('puzzles');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('team');
   const [soundEnabled, setSoundEnabled] = useState(soundFx.isEnabled());
   const [isSimulating, setIsSimulating] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Initialize Teams from localStorage or fallback
+  // Concurrency & Single Active Session State
+  const [displacedSessionInfo, setDisplacedSessionInfo] = useState(null);
+  const [isCollisionModalOpen, setIsCollisionModalOpen] = useState(false);
+  const [displacedTeam, setDisplacedTeam] = useState(null);
+
+  // Initialize Teams from localStorage (in production, purge any legacy seeded dummy teams)
   const [teams, setTeams] = useState(() => {
-    const saved = localStorage.getItem('vq_teams_data');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vq_prod_teams_v1') || localStorage.getItem('vq_teams_data');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Filter out legacy demo teams
+          const DEMO_IDS = [
+            'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
+            'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
+          ];
+          const clean = parsed.filter((t) => !DEMO_IDS.includes(t.id));
+          return clean;
+        } catch {
+          // fallback
+        }
       }
     }
     return INITIAL_TEAMS;
   });
 
-  // Current logged in team id
+  // Current logged in team id (starts null in production for unauthenticated visitors)
   const [activeTeamId, setActiveTeamId] = useState(() => {
+    if (typeof window === 'undefined') return null;
     const saved = localStorage.getItem('vq_active_team_id');
-    return saved !== null ? saved : 'team_bitflipper_01';
+    // If it was the legacy demo team, clear it
+    if (!saved || saved === 'team_bitflipper_01' || saved.startsWith('team_rtl') || saved.startsWith('team_fpga')) {
+      return null;
+    }
+    
+    // Check if another tab/device is already running an active session for this team
+    const activeSession = sessionManager.getActiveSession(saved);
+    const myTabSessionId = sessionStorage.getItem('vq_current_session_id');
+    if (activeSession && activeSession.tabId !== sessionManager.tabId && activeSession.sessionId !== myTabSessionId) {
+      // Another tab is active; start in spectator mode to prevent multi-tab collision
+      return null;
+    }
+    return saved;
   });
 
   // Hints used by teams
@@ -54,15 +84,41 @@ export const App = () => {
   const [activityLogs, setActivityLogs] = useState(() => {
     const saved = localStorage.getItem('vq_activity_logs');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        // Filter out legacy mock logs
+        return parsed.filter((log) => !log.id.startsWith('act_') || Number(log.id.replace('act_', '')) > 100);
+      } catch {}
     }
     return INITIAL_ACTIVITY_LOGS;
   });
 
-  // Active Team Object
-  const activeTeam = teams.find((t) => t.id === activeTeamId) || null;
+  // Active Team Object (supports competing teams and admin account)
+  const activeTeam = (activeTeamId === ADMIN_TEAM.id)
+    ? ADMIN_TEAM
+    : (teams.find((t) => t.id === activeTeamId) || null);
   const currentTeamSolved = activeTeam ? activeTeam.solvedPuzzles : [];
   const activeTeamUsedHints = activeTeamId ? (usedHintsMap[activeTeamId] || []) : [];
+
+  // Register active session & listen for concurrent displacement
+  useEffect(() => {
+    if (activeTeamId) {
+      sessionManager.registerSession(activeTeamId);
+    }
+
+    const unsubscribe = sessionManager.subscribe((info) => {
+      soundFx.playError();
+      const currentActive = teams.find((t) => t.id === info.teamId || t.id === activeTeamId);
+      setDisplacedTeam(currentActive || null);
+      setDisplacedSessionInfo(info);
+      setIsCollisionModalOpen(true);
+      setActiveTeamId(null);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Persist teams to localStorage
   useEffect(() => {
@@ -187,14 +243,20 @@ export const App = () => {
     showToast(`⚠️ Hint unlocked (+${puzzle.hintPenaltyMinutes}m timing penalty).`);
   };
 
-  // Switch / Login Team
+  // Switch / Login Team with Single Active Session Registration
   const handleLoginTeam = (team) => {
+    sessionManager.registerSession(team.id);
     setActiveTeamId(team.id);
-    showToast(`Welcome back, ${team.name}!`);
+    setIsCollisionModalOpen(false);
+    setDisplacedSessionInfo(null);
+    showToast(team.isAdmin 
+      ? `👑 Welcome, ACM Vidyut Proctor! Master operations unlocked.` 
+      : `Welcome back, ${team.name}! (Single terminal locked to this tab)`
+    );
   };
 
-  // Register New Team
-  const handleRegisterTeam = (newTeamData) => {
+  // Admin Provision New Team (Only callable by Admin)
+  const handleAdminAddTeam = (newTeamData) => {
     const newId = `team_${Date.now()}`;
     const newTeam = {
       ...newTeamData,
@@ -207,14 +269,87 @@ export const App = () => {
     };
 
     setTeams((prev) => [newTeam, ...prev]);
-    setActiveTeamId(newId);
-    showToast(`Team "${newTeam.name}" registered successfully!`);
+
+    const newEvent = {
+      id: `act_${Date.now()}`,
+      timestamp: Date.now(),
+      teamId: newId,
+      teamName: newTeam.name,
+      puzzleId: 0,
+      puzzleTitle: 'Team Authorized',
+      type: 'SOLVE',
+      message: `👑 [ADMIN PROVISIONED]: New team "${newTeam.name}" (${newTeam.college}) authorized.`
+    };
+    setActivityLogs((prev) => [newEvent, ...prev.slice(0, 30)]);
+    showToast(`👑 Team "${newTeam.name}" successfully provisioned and authorized!`);
+    return newTeam;
+  };
+
+  // Admin Delete Team
+  const handleAdminDeleteTeam = (teamId) => {
+    const teamToDelete = teams.find((t) => t.id === teamId);
+    if (!teamToDelete) return;
+    sessionManager.releaseSession(teamId);
+    setTeams((prev) => prev.filter((t) => t.id !== teamId));
+    showToast(`Team "${teamToDelete.name}" removed from competition.`);
+  };
+
+  // Admin Reset Session Lock
+  const handleAdminResetSession = (teamId) => {
+    const team = teams.find((t) => t.id === teamId);
+    sessionManager.releaseSession(teamId);
+    showToast(`Session lock reset for ${team?.name || 'team'}.`);
   };
 
   // Logout / Switch Team
   const handleLogout = () => {
+    if (activeTeamId) {
+      sessionManager.releaseSession(activeTeamId);
+    }
     setActiveTeamId(null);
     showToast('Logged out of team profile.');
+  };
+
+  // Take Over Session on this tab (Displaces any conflicting tab/device)
+  const handleTakeOverSession = () => {
+    const targetTeam = displacedTeam || teams.find((t) => t.id === displacedSessionInfo?.teamId) || teams[0];
+    if (targetTeam) {
+      sessionManager.registerSession(targetTeam.id);
+      setActiveTeamId(targetTeam.id);
+      setIsCollisionModalOpen(false);
+      setDisplacedSessionInfo(null);
+      showToast(`⚡ Session claimed on this tab! Other tab/device has been locked.`);
+    }
+  };
+
+  // Continue in Spectator Mode (dismisses collision modal)
+  const handleSpectate = () => {
+    setIsCollisionModalOpen(false);
+    setDisplacedSessionInfo(null);
+    showToast('Viewing contest in spectator mode. Sign in to submit.');
+  };
+
+  // Switch Team from Collision Modal
+  const handleSwitchTeamFromModal = () => {
+    setIsCollisionModalOpen(false);
+    setDisplacedSessionInfo(null);
+    setIsAuthModalOpen(true);
+  };
+
+  // Simulate External Concurrency Collision (For testing single-session lock)
+  const handleSimulateExternalCollision = () => {
+    const targetTeam = activeTeam || teams[0];
+    if (!targetTeam) return;
+
+    soundFx.playError();
+    sessionManager.notifyTerminated({
+      reason: 'CONCURRENT_LOGIN_DETECTED',
+      teamId: targetTeam.id,
+      bySessionId: `sess_remote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      byTabId: `tab_external_${Math.random().toString(36).substring(2, 6)}`,
+      byDevice: 'External Workstation (Firefox on Linux)',
+      timestamp: Date.now()
+    });
   };
 
   // Jump to next unsolved puzzle
@@ -299,10 +434,11 @@ export const App = () => {
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         activeTeam={activeTeam}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenAuthModal={() => {
+          setAuthModalMode('team');
+          setIsAuthModalOpen(true);
+        }}
         onLogout={handleLogout}
-        soundEnabled={soundEnabled}
-        onToggleSound={handleToggleSound}
         solvedCount={currentTeamSolved.length}
         totalPuzzles={PUZZLES.length}
       />
@@ -356,9 +492,20 @@ export const App = () => {
             teams={teams}
             puzzles={PUZZLES}
             activeTeam={activeTeam}
+            activityLogs={activityLogs}
+            isSimulating={isSimulating}
+            onToggleSimulation={() => setIsSimulating(!isSimulating)}
+            onBroadcast={showToast}
+            onSimulateCollision={handleSimulateExternalCollision}
+            onAdminAddTeam={handleAdminAddTeam}
+            onAdminDeleteTeam={handleAdminDeleteTeam}
+            onAdminResetSession={handleAdminResetSession}
+            onOpenAdminLogin={() => {
+              setAuthModalMode('admin');
+              setIsAuthModalOpen(true);
+            }}
           />
         )}
-
         {currentTab === 'rules' && (
           <RulesView />
         )}
@@ -367,13 +514,23 @@ export const App = () => {
       {/* Footer */}
       <Footer />
 
-      {/* Team Authentication Modal */}
+      {/* Single-Session Concurrency Collision Modal */}
+      <SessionCollisionModal
+        isOpen={isCollisionModalOpen}
+        displacementInfo={displacedSessionInfo}
+        team={displacedTeam}
+        onTakeOver={handleTakeOverSession}
+        onSpectate={handleSpectate}
+        onSwitchTeam={handleSwitchTeamFromModal}
+      />
+
+      {/* Team Authentication / Admin Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         teams={teams}
         onLogin={handleLoginTeam}
-        onRegister={handleRegisterTeam}
+        initialMode={authModalMode}
       />
 
       {/* Floating Toast Notification - Upgraded to Glassmorphism */}

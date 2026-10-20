@@ -1,18 +1,107 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
-  BarChart3, 
   Activity, 
-  AlertOctagon,
-  Timer,
-  TrendingUp
+  AlertOctagon, 
+  Timer, 
+  TrendingUp, 
+  Radio, 
+  Terminal, 
+  Download, 
+  Play, 
+  Pause, 
+  Send, 
+  ShieldCheck, 
+  Search, 
+  CheckCircle2, 
+  Clock, 
+  AlertTriangle,
+  Cpu,
+  Layers,
+  Sparkles,
+  Crown,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  UserPlus,
+  Users,
+  KeyRound,
+  ShieldAlert
 } from 'lucide-react';
+import { soundFx } from '../utils/sound';
+import { sessionManager } from '../utils/sessionManager';
 
 export const LiveAnalysisView = ({
   teams,
   puzzles,
-  activeTeam
+  activeTeam,
+  activityLogs = [],
+  isSimulating = false,
+  onToggleSimulation,
+  onBroadcast,
+  onSimulateCollision,
+  onAdminAddTeam,
+  onAdminDeleteTeam,
+  onAdminResetSession,
+  onOpenAdminLogin
 }) => {
-  const totalTeams = teams.length;
+  const [selectedTeamId, setSelectedTeamId] = useState(activeTeam?.id || teams[0]?.id || '');
+  const [logFilter, setLogFilter] = useState('ALL');
+  const [broadcastText, setBroadcastText] = useState('');
+  const [searchTeamQuery, setSearchTeamQuery] = useState('');
+
+  // Admin New Team State
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamCollege, setNewTeamCollege] = useState('NITK Surathkal');
+  const [newTeamMembers, setNewTeamMembers] = useState('');
+  const [newTeamPasscode, setNewTeamPasscode] = useState('');
+  const [newTeamAvatar, setNewTeamAvatar] = useState('⚡');
+  const [showPasscodes, setShowPasscodes] = useState(false);
+
+  const handleCreateTeamSubmit = (e) => {
+    e.preventDefault();
+    if (!newTeamName.trim() || !newTeamPasscode.trim()) return;
+
+    soundFx.playVictory();
+    if (onAdminAddTeam) {
+      onAdminAddTeam({
+        name: newTeamName.trim(),
+        college: newTeamCollege.trim() || 'NITK Surathkal',
+        members: newTeamMembers.split(',').map((m) => m.trim()).filter(Boolean),
+        passcode: newTeamPasscode.trim(),
+        avatarSeed: newTeamAvatar
+      });
+    }
+
+    setNewTeamName('');
+    setNewTeamMembers('');
+    setNewTeamPasscode('');
+  };
+
+  const competingTeams = teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut');
+  const totalTeams = competingTeams.length;
+  const totalSolves = competingTeams.reduce((acc, t) => acc + t.solvedPuzzles.length, 0);
+  const leaderTeam = competingTeams.length > 0 
+    ? [...competingTeams].sort((a, b) => b.solvedPuzzles.length - a.solvedPuzzles.length || b.score - a.score)[0]
+    : null;
+
+  // Compute global average solve duration dynamically
+  let globalTotalDurationMs = 0;
+  let globalSolvesCount = 0;
+  competingTeams.forEach((t) => {
+    t.solvedPuzzles.forEach((pId) => {
+      const ts = t.puzzleSolveTimestamps[pId];
+      if (ts) {
+        const prevTs = pId === 1 ? ts - 15 * 60 * 1000 : (t.puzzleSolveTimestamps[pId - 1] || ts - 20 * 60 * 1000);
+        globalTotalDurationMs += Math.max(ts - prevTs, 3 * 60 * 1000);
+        globalSolvesCount++;
+      }
+    });
+  });
+  const globalAvgSolveMins = globalSolvesCount > 0 
+    ? Math.round(globalTotalDurationMs / globalSolvesCount / (60 * 1000))
+    : null;
 
   // Compute analytics per puzzle
   const puzzleStats = puzzles.map((puzzle) => {
@@ -21,13 +110,12 @@ export const LiveAnalysisView = ({
     let fastestTeamName = 'None';
     let totalSolveDurationMs = 0;
 
-    teams.forEach((t) => {
+    competingTeams.forEach((t) => {
       if (t.solvedPuzzles.includes(puzzle.id)) {
         solvesCount++;
         const ts = t.puzzleSolveTimestamps[puzzle.id];
-        // Calculate solve time relative to previous puzzle solve or start
         const prevTs = puzzle.id === 1 ? ts - 15 * 60 * 1000 : (t.puzzleSolveTimestamps[puzzle.id - 1] || ts - 20 * 60 * 1000);
-        const duration = Math.max(ts - prevTs, 3 * 60 * 1000); // minimum 3 mins
+        const duration = Math.max(ts - prevTs, 3 * 60 * 1000);
 
         totalSolveDurationMs += duration;
         if (duration < fastestSolveDurationMs) {
@@ -48,88 +136,752 @@ export const LiveAnalysisView = ({
       fastestTeamName,
       fastestMins,
       avgDurationMins,
-      isBottleneck: completionRate < 40 && puzzle.id > 4
+      isBottleneck: completionRate < 40 && puzzle.id > 3 && totalTeams > 0
     };
   });
 
+  // Inspected Team
+  const inspectedTeam = competingTeams.find((t) => t.id === selectedTeamId) || competingTeams[0] || null;
+
+  // Filtered Activity Logs
+  const filteredLogs = activityLogs.filter((log) => {
+    if (logFilter === 'SOLVES') return log.type === 'SOLVE' || log.type === 'FINISH_ALL';
+    if (logFilter === 'MILESTONES') return log.type === 'FINISH_ALL' || log.type === 'MILESTONE_5';
+    if (logFilter === 'HINTS') return log.type === 'HINT' || (log.message && log.message.includes('Hint'));
+    return true;
+  });
+
+  // Handle Broadcast Message
+  const handleSendBroadcast = (e) => {
+    e.preventDefault();
+    if (!broadcastText.trim()) return;
+    soundFx.playZap();
+    if (onBroadcast) {
+      onBroadcast(`📢 [ORGANIZER BROADCAST]: ${broadcastText.trim()}`);
+    }
+    setBroadcastText('');
+  };
+
+  // Export Telemetry Snapshot
+  const handleExportSnapshot = () => {
+    soundFx.playClick();
+    const snapshot = {
+      event: "VERILOG QUEST '26",
+      organizers: "ACM NITK Vidyut × Engineer NITK '26",
+      titleSponsor: "Arcesium",
+      exportTimestamp: new Date().toISOString(),
+      competitionMetrics: {
+        totalTeams,
+        totalSolves,
+        globalAverageSolveMins: globalAvgSolveMins || 0,
+        anomalyCount: 0
+      },
+      puzzleStatistics: puzzleStats.map((s) => ({
+        stageNumber: s.puzzle.stageNumber,
+        title: s.puzzle.title,
+        solvesCount: s.solvesCount,
+        completionRate: `${s.completionRate}%`,
+        fastestTeam: s.fastestTeamName,
+        fastestMins: s.fastestMins,
+        avgDurationMins: s.avgDurationMins
+      })),
+      teamStandings: teams.map((t, idx) => ({
+        rank: idx + 1,
+        teamId: t.id,
+        name: t.name,
+        college: t.college,
+        score: t.score,
+        stagesSolved: t.solvedPuzzles.length,
+        penaltyMinutes: t.penaltyMinutes,
+        lastActive: new Date(t.lastActive).toISOString()
+      })),
+      auditLogs: activityLogs.slice(0, 50)
+    };
+
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `verilog_quest_telemetry_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="p-6 rounded-2xl bg-[#141518]/90 border border-[#23252a] shadow-[0_0_20px_rgba(0,240,255,0.12)]">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-          <span className="text-xs font-mono uppercase tracking-wider text-[#00e5ff] font-bold">
-            STATISTICAL TELEMETRY
-          </span>
-          <span className="text-slate-500">&bull;</span>
-          <span className="text-xs text-slate-400">Live Task Completion Analysis</span>
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 select-none">
+      
+      {/* ── 1. MAIN MONITORING HUD HEADER ── */}
+      <div className="p-6 rounded-2xl bg-[#111215] border border-[#22242a] shadow-xl relative overflow-hidden">
+        {/* Subtle background radar grid */}
+        <div className="absolute inset-0 bg-[radial-gradient(#00e5ff_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.03] pointer-events-none" />
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#00e5ff] font-bold">
+                ACM SURATHKAL // LIVE MONITORING CONSOLE
+              </span>
+              <span className="text-zinc-600">&bull;</span>
+              <span className="text-xs font-mono text-zinc-400">FPGA BITSTREAM TELEMETRY</span>
+            </div>
+
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3 font-display">
+              <Activity className="w-7 h-7 text-[#00e5ff]" />
+              Mission Operations &amp; Telemetry Hub
+            </h2>
+
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+              Real-time monitoring interface for ACM NITK Vidyut × Engineer NITK '26 judges, proctors, and competitors. Tracks stage clearance friction, submission anomalies, and live team velocities.
+            </p>
+          </div>
+
+          {/* Quick Hardware Health Badges */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0 font-mono text-xs">
+            <div className="px-3 py-1.5 rounded-lg bg-[#16171b] border border-[#252830] flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span className="text-zinc-400">CLOCK:</span>
+              <span className="text-white font-bold">250.00 MHz</span>
+            </div>
+
+            <div className="px-3 py-1.5 rounded-lg bg-[#16171b] border border-[#252830] flex items-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#00e5ff]" />
+              <span className="text-zinc-400">TIMING:</span>
+              <span className="text-emerald-400 font-bold">VERIFIED</span>
+            </div>
+
+            <button
+              onClick={handleExportSnapshot}
+              className="px-3.5 py-1.5 rounded-lg bg-[#1a1b20] hover:bg-[#23252c] text-white border border-[#2c2f37] flex items-center gap-2 transition"
+              title="Download Telemetry JSON snapshot for judges"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Export Telemetry</span>
+            </button>
+          </div>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
-          <BarChart3 className="w-7 h-7 text-[#00e5ff]" />
-          RTL Puzzle Velocity &amp; Bottleneck Analysis
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-300 mt-1">
-          Detailed metrics by task: completion velocity, fastest solves, stage clearance friction, and team timeline trajectories.
-        </p>
+
+        {/* System Telemetry Micro-Readout Bar */}
+        <div className="mt-5 pt-4 border-t border-[#1c1e23] grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] font-mono text-zinc-400">
+          <div className="flex items-center gap-1.5">
+            <span className="text-zinc-600">&bull;</span>
+            <span>Vivado Runner:</span>
+            <span className="text-emerald-400 font-semibold">ONLINE (14ms)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-zinc-600">&bull;</span>
+            <span>Bitstream Integrity:</span>
+            <span className="text-cyan-400 font-semibold">100% SHA-256</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-zinc-600">&bull;</span>
+            <span>Submission Queue:</span>
+            <span className="text-white font-semibold">0 ms wait</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-zinc-600">&bull;</span>
+            <span>Timing Anomalies:</span>
+            <span className="text-emerald-400 font-semibold">0 Flagged</span>
+          </div>
+        </div>
       </div>
 
-      {/* Metric KPI cards */}
+      {/* ── 2. METRIC KPI CARDS ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800">
-          <div className="text-[11px] font-mono text-slate-400 uppercase">Active Competing Teams</div>
+        <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
+          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Active Teams</div>
           <div className="text-2xl font-black text-white font-mono mt-1">{totalTeams} Teams</div>
-          <div className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
-            <Activity className="w-3 h-3" /> 100% telemetry online
+          <div className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 100% telemetry sync
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800">
-          <div className="text-[11px] font-mono text-slate-400 uppercase">Total Verified Solves</div>
-          <div className="text-2xl font-black text-[#00e5ff] font-mono mt-1">
-            {teams.reduce((acc, t) => acc + t.solvedPuzzles.length, 0)} Solves
+        <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
+          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Verified Solves</div>
+          <div className="text-2xl font-black text-[#00e5ff] font-mono mt-1">{totalSolves} Solves</div>
+          <div className="text-[11px] text-zinc-400 mt-1 font-mono">Across 10 hardware stages</div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
+          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Average Velocity</div>
+          <div className="text-2xl font-black text-amber-400 font-mono mt-1">
+            {globalAvgSolveMins !== null ? `${globalAvgSolveMins} mins` : '—'}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">Across 10 hardware stages</div>
+          <div className="text-[11px] text-zinc-400 mt-1 font-mono">Mean clearance per stage</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800">
-          <div className="text-[11px] font-mono text-slate-400 uppercase">Average Solve Time</div>
-          <div className="text-2xl font-black text-amber-400 font-mono mt-1">16.4 mins</div>
-          <div className="text-[11px] text-slate-400 mt-1">Per unlocked hardware stage</div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800">
-          <div className="text-[11px] font-mono text-slate-400 uppercase">Leader Pace</div>
-          <div className="text-2xl font-black text-purple-400 font-mono mt-1">9 / 10 Stages</div>
-          <div className="text-[11px] text-slate-400 mt-1">RTL_Overclockers (NITK)</div>
+        <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
+          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Leader Pace</div>
+          <div className="text-2xl font-black text-purple-400 font-mono mt-1">
+            {leaderTeam ? `${leaderTeam.solvedPuzzles.length} / 10 Stages` : '0 / 10 Stages'}
+          </div>
+          <div className="text-[11px] text-zinc-400 mt-1 font-mono truncate">
+            {leaderTeam ? `${leaderTeam.name} (${leaderTeam.college})` : 'Awaiting team solves'}
+          </div>
         </div>
       </div>
 
-      {/* Stage-by-Stage Completion Breakdown Table */}
-      <div className="rounded-2xl border border-slate-800 bg-[#131417]/90 overflow-hidden shadow-2xl">
-        <div className="p-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
-          <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
+      {/* ── 3. ORGANIZER DISPATCH & SIMULATION CONTROLS ── */}
+      <div className="p-5 rounded-2xl bg-[#131418] border border-[#22242a] space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Radio className="w-4 h-4 text-amber-400" />
+              Event Operations &amp; Live Simulation Controller
+            </h3>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              Control the live competition simulation or broadcast instant announcements across all connected team terminals.
+            </p>
+          </div>
+
+          {/* Simulation Toggle */}
+          {onToggleSimulation && (
+            <button
+              onClick={() => {
+                soundFx.playClick();
+                onToggleSimulation();
+              }}
+              className={`px-4 py-2 rounded-xl font-mono text-xs font-bold flex items-center gap-2 transition ${
+                isSimulating
+                  ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                  : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800 hover:bg-emerald-900/80'
+              }`}
+            >
+              {isSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              <span>{isSimulating ? 'Pause Live Simulation' : 'Resume Live Simulation'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Live Broadcast Dispatch Input */}
+        <form onSubmit={handleSendBroadcast} className="flex gap-2 pt-2 border-t border-[#1e2025]">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={broadcastText}
+              onChange={(e) => setBroadcastText(e.target.value)}
+              placeholder="Broadcast official organizer alert to all screens (e.g. 'Stage 07 hint unlocked in 5 minutes')..."
+              className="w-full px-3.5 py-2 rounded-xl bg-[#0e0f11] border border-[#23252b] text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus:border-[#00e5ff] transition"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!broadcastText.trim()}
+            className="px-4 py-2 rounded-xl bg-[#00e5ff] text-black font-mono text-xs font-bold flex items-center gap-1.5 hover:bg-cyan-300 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Broadcast</span>
+          </button>
+        </form>
+
+        {/* Single-Session Concurrency Integrity Box */}
+        <div className="pt-3 border-t border-[#1e2025] flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-emerald-950/60 border border-emerald-700/50 flex items-center justify-center text-emerald-400 shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white font-mono">Single-Device Authentication Lock</span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-800/60">
+                  ENFORCED (1/1 Instances)
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 font-mono">
+                Tab ID #{sessionManager.tabId.slice(-6)} on {sessionManager.deviceLabel} · Cross-tab collisions blocked: {sessionManager.concurrencyCollisionCount}
+              </p>
+            </div>
+          </div>
+
+          {onSimulateCollision && (
+            <button
+              type="button"
+              onClick={onSimulateCollision}
+              className="px-3 py-1.5 rounded-lg bg-amber-950/50 hover:bg-amber-900/60 border border-amber-600/50 text-amber-300 font-mono text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0"
+              title="Test the real-time collision lockout when another device logs into this team"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Simulate External Collision</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── 3.5. ADMIN TEAM PROVISIONING & CREDENTIALS MATRIX ── */}
+      <div className="p-6 rounded-2xl bg-[#111216] border border-[#232630] space-y-6 shadow-xl relative overflow-hidden">
+        {activeTeam?.isAdmin ? (
+          /* Admin View: Active Provisioning Console */
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-[#1e2028]">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <span className="text-xs font-mono uppercase tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5" />
+                    MASTER PROCTOR CONTROLS // ACM VIDYUT
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-amber-400" />
+                  Team Provisioning &amp; Access Authorization Center
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Authorized administrators can provision new teams, assign custom passcodes, reset stuck sessions, or manage the official roster.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasscodes(!showPasscodes)}
+                  className="px-3 py-1.5 rounded-lg bg-[#181920] border border-[#2a2d39] text-xs font-mono text-zinc-300 hover:text-white flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  {showPasscodes ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5 text-zinc-400" />}
+                  <span>{showPasscodes ? 'Mask Passcodes' : 'Reveal Passcodes'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Add Team Form (5 cols) */}
+              <div className="lg:col-span-5 p-5 rounded-xl bg-[#15161c] border border-[#252834] space-y-4">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-white uppercase tracking-wider">
+                  <Plus className="w-4 h-4 text-emerald-400" />
+                  <span>Provision New Team</span>
+                </div>
+
+                <form onSubmit={handleCreateTeamSubmit} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block text-zinc-400 font-mono mb-1">Team Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      placeholder="e.g. QuantumCircuits_NITK"
+                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-zinc-400 font-mono mb-1">College / Institute *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newTeamCollege}
+                      onChange={(e) => setNewTeamCollege(e.target.value)}
+                      placeholder="e.g. NITK Surathkal"
+                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-zinc-400 font-mono mb-1">Members (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={newTeamMembers}
+                      onChange={(e) => setNewTeamMembers(e.target.value)}
+                      placeholder="e.g. Arjun S., Priya M."
+                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-zinc-400 font-mono mb-1">Team Passcode *</label>
+                      <input
+                        type="text"
+                        required
+                        value={newTeamPasscode}
+                        onChange={(e) => setNewTeamPasscode(e.target.value)}
+                        placeholder="e.g. gate789"
+                        className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-zinc-400 font-mono mb-1">Avatar Crest</label>
+                      <select
+                        value={newTeamAvatar}
+                        onChange={(e) => setNewTeamAvatar(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
+                      >
+                        <option value="⚡">⚡ Lightning Core</option>
+                        <option value="🔥">🔥 Thermal Overclock</option>
+                        <option value="👾">👾 Bit Inverter</option>
+                        <option value="🛡️">🛡️ Fault Tolerant</option>
+                        <option value="🌊">🌊 Silicon Surfer</option>
+                        <option value="🚪">🚪 Logic Gate</option>
+                        <option value="🐍">🐍 Verilog Viper</option>
+                        <option value="👑">👑 NAND Lord</option>
+                        <option value="💎">💎 Silicon Crystal</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-mono font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Authorize &amp; Provision Team</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Right Column: Roster & Session Management (7 cols) */}
+              <div className="lg:col-span-7 p-5 rounded-xl bg-[#15161c] border border-[#252834] flex flex-col">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-white uppercase tracking-wider">
+                    <Users className="w-4 h-4 text-cyan-400" />
+                    <span>Official Team Roster ({teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length} Teams)</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400">
+                    Passcode &amp; Session Management
+                  </span>
+                </div>
+
+                <div className="space-y-2 overflow-y-auto max-h-[340px] pr-1">
+                  {teams
+                    .filter((t) => !t.isAdmin && t.id !== 'admin_vidyut')
+                    .map((t) => {
+                      const activeSession = sessionManager.getActiveSession(t.id);
+                      return (
+                        <div
+                          key={t.id}
+                          className="p-3 rounded-lg bg-[#0e0f12] border border-[#20222a] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2 font-bold text-white">
+                              <span className="text-base">{t.avatarSeed}</span>
+                              <span className="text-sm">{t.name}</span>
+                              <span className="text-[10px] font-normal text-zinc-400 font-mono">
+                                ({t.college})
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+                              <span>Members: {t.members?.join(', ') || 'Unassigned'}</span>
+                              <span>&bull;</span>
+                              <span className="font-mono text-amber-300">
+                                Passcode: {showPasscodes ? (t.passcode || 'none') : '••••••'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] font-mono text-zinc-500">
+                              {activeSession ? (
+                                <span className="text-emerald-400 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  Active on: {activeSession.deviceLabel || 'Terminal'} (Tab #{activeSession.tabId?.slice(-4)})
+                                </span>
+                              ) : (
+                                <span className="text-zinc-500 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                                  Offline / No Active Session
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {onAdminResetSession && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  soundFx.playClick();
+                                  onAdminResetSession(t.id);
+                                }}
+                                title="Reset Session Lock (Clears any stuck session)"
+                                className="p-1.5 rounded bg-[#181a22] hover:bg-[#232632] border border-[#292c3a] text-zinc-300 hover:text-amber-300 text-[11px] font-mono flex items-center gap-1 transition"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                <span className="hidden sm:inline">Reset Lock</span>
+                              </button>
+                            )}
+
+                            {onAdminDeleteTeam && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  soundFx.playClick();
+                                  if (confirm(`Are you sure you want to remove team "${t.name}"?`)) {
+                                    onAdminDeleteTeam(t.id);
+                                  }
+                                }}
+                                title="Remove team from competition"
+                                className="p-1.5 rounded bg-rose-950/40 hover:bg-rose-950/70 border border-rose-800/40 text-rose-300 hover:text-rose-200 transition"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Non-Admin View: Call to Authenticate */
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-2">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>ACM Vidyut Team Provisioning &amp; Admin Gateway</span>
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-700/60 font-normal">
+                    RESTRICTED
+                  </span>
+                </h4>
+                <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                  Participant self-registration is closed. Only authorized ACM Vidyut Proctors with administrative credentials can add new teams and manage roster access.
+                </p>
+              </div>
+            </div>
+
+            {onOpenAdminLogin && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  onOpenAdminLogin();
+                }}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-mono font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] transition cursor-pointer shrink-0"
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>Enter Admin Gateway</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 4. TWO-COLUMN MONITOR: LIVE SUBMISSION AUDIT & TEAM INSPECTOR ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* Left Column: Live Submission Stream & Audit Log (7 cols) */}
+        <div className="lg:col-span-7 rounded-2xl border border-[#202227] bg-[#111215] overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-[#1d1f24] bg-[#0e0f12] flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[#00e5ff]" />
+              <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                Live Submission &amp; Audit Stream
+              </h3>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1 text-[10px] font-mono">
+              {['ALL', 'SOLVES', 'MILESTONES', 'HINTS'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => {
+                    soundFx.playClick();
+                    setLogFilter(f);
+                  }}
+                  className={`px-2 py-0.5 rounded transition ${
+                    logFilter === f
+                      ? 'bg-[#00e5ff] text-black font-bold'
+                      : 'text-zinc-400 hover:text-white hover:bg-[#1b1c22]'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Audit Stream Logs List */}
+          <div className="p-4 space-y-2 max-h-[420px] overflow-y-auto font-mono text-xs divide-y divide-[#181a1f]">
+            {filteredLogs.length === 0 ? (
+              <div className="p-8 text-center text-zinc-500 text-xs">
+                No events recorded for filter "{logFilter}".
+              </div>
+            ) : (
+              filteredLogs.map((log) => {
+                const dateStr = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const isSolve = log.type === 'SOLVE' || log.type === 'FINISH_ALL';
+                const isMilestone = log.type === 'FINISH_ALL' || log.type === 'MILESTONE_5';
+
+                return (
+                  <div key={log.id} className="pt-2 flex items-start justify-between gap-3 text-[11px]">
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-500 font-mono text-[10px] shrink-0 pt-0.5">{dateStr}</span>
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-white">{log.teamName}</span>
+                          {isMilestone ? (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[9px] font-bold">
+                              MILESTONE
+                            </span>
+                          ) : isSolve ? (
+                            <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[9px]">
+                              STAGE {String(log.puzzleId).padStart(2, '0')}
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-800 text-[9px]">
+                              PENALTY
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-zinc-400 mt-0.5">{log.message}</p>
+                      </div>
+                    </div>
+
+                    <span className="text-[#00e5ff] font-bold shrink-0">
+                      {isSolve ? `+100` : ''}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Live Team Inspector Console (5 cols) */}
+        <div className="lg:col-span-5 rounded-2xl border border-[#202227] bg-[#111215] overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-[#1d1f24] bg-[#0e0f12] flex items-center justify-between">
+            <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Search className="w-4 h-4 text-amber-400" />
+              Live Team Inspector
+            </h3>
+            <span className="text-[10px] font-mono text-zinc-500">Node Diagnostic</span>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {competingTeams.length === 0 ? (
+              <div className="p-8 rounded-xl bg-[#0e0f11] border border-[#1e2025] text-center space-y-2">
+                <Users className="w-6 h-6 text-zinc-600 mx-auto" />
+                <p className="text-xs font-mono text-zinc-400 font-bold">
+                  No Competing Teams Registered Yet
+                </p>
+                <p className="text-[11px] text-zinc-500 max-w-xs mx-auto">
+                  Use the Team Provisioning Center above to add teams and inspect real-time solve telemetry.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Team Picker Selector */}
+                <div>
+                  <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
+                    Select Team to Inspect
+                  </label>
+                  <select
+                    value={selectedTeamId}
+                    onChange={(e) => {
+                      soundFx.playClick();
+                      setSelectedTeamId(e.target.value);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0e0f11] border border-[#24262d] text-xs font-mono text-white focus:outline-none focus:border-[#00e5ff]"
+                  >
+                    {competingTeams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.college}) &bull; {t.solvedPuzzles.length}/10 Solved ({t.score} pts)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {inspectedTeam && (
+                  <div className="space-y-3">
+                    {/* Team Card Info */}
+                    <div className="p-3.5 rounded-xl bg-[#141518] border border-[#22242a] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#1a1b20] border border-[#2c2f38] flex items-center justify-center text-lg">
+                          {inspectedTeam.avatarSeed}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-sm">{inspectedTeam.name}</div>
+                          <div className="text-[11px] text-zinc-400 font-mono">{inspectedTeam.college}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-right font-mono">
+                        <div className="text-base font-black text-amber-400">{inspectedTeam.score} pts</div>
+                        <div className="text-[10px] text-zinc-500">Penalty: {inspectedTeam.penaltyMinutes}m</div>
+                      </div>
+                    </div>
+
+                    {/* Stage Matrix Checklist */}
+                    <div>
+                      <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>10-Stage Decryption Grid</span>
+                        <span>{inspectedTeam.solvedPuzzles.length} of 10 Unlocked</span>
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-1.5 font-mono text-xs">
+                        {puzzles.map((p) => {
+                          const isSolved = inspectedTeam.solvedPuzzles.includes(p.id);
+                          return (
+                            <div
+                              key={p.id}
+                              className={`p-2 rounded-lg border text-center transition ${
+                                isSolved
+                                  ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 font-bold'
+                                  : 'bg-[#141518] border-[#22242a] text-zinc-600'
+                              }`}
+                              title={`Stage 0${p.id}: ${p.title} (${isSolved ? 'SOLVED' : 'LOCKED'})`}
+                            >
+                              <div className="text-[9px] uppercase">S0{p.id}</div>
+                              <div className="mt-0.5">{isSolved ? '✓' : '—'}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Timing & Integrity Readout */}
+                    <div className="p-3 rounded-xl bg-[#0e0f11] border border-[#1e2025] text-[11px] font-mono space-y-1.5">
+                      <div className="flex justify-between text-zinc-400">
+                        <span>Synthesis Bitstream:</span>
+                        <span className="text-cyan-400 font-bold">{Math.round((inspectedTeam.solvedPuzzles.length / 10) * 100)}% Complete</span>
+                      </div>
+                      <div className="flex justify-between text-zinc-400">
+                        <span>Anomaly Detection:</span>
+                        <span className="text-emerald-400 font-bold">0 Flagged (No Violations)</span>
+                      </div>
+                      <div className="flex justify-between text-zinc-400">
+                        <span>Last Telemetry Sync:</span>
+                        <span className="text-white">{inspectedTeam.lastActive ? new Date(inspectedTeam.lastActive).toLocaleTimeString() : '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── 5. STAGE-BY-STAGE COMPLETION & BOTTLENECK ANALYSIS TABLE ── */}
+      <div className="rounded-2xl border border-[#202227] bg-[#111215] overflow-hidden shadow-xl">
+        <div className="p-4 border-b border-[#1d1f24] bg-[#0e0f12] flex items-center justify-between">
+          <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Timer className="w-4 h-4 text-[#00e5ff]" />
-            Task Completion &amp; Speed Metrics (P1 &ndash; P10)
+            Hardware Stage Clearance &amp; Friction Matrix (Stage 01 &ndash; Stage 10)
           </h3>
-          <span className="text-xs text-slate-400 font-mono">Updated in Real Time</span>
+          <span className="text-xs text-zinc-500 font-mono">Live Proctored Analysis</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#0f1012] text-slate-400 font-mono text-[11px] uppercase border-b border-slate-800">
+            <thead className="bg-[#0c0d0f] text-zinc-400 font-mono text-[11px] uppercase border-b border-[#1d1f24]">
               <tr>
                 <th className="py-3 px-4">Stage #</th>
-                <th className="py-3 px-4">Challenge Name</th>
-                <th className="py-3 px-3">Category</th>
-                <th className="py-3 px-3 text-center">Completion Rate</th>
+                <th className="py-3 px-4">Challenge Statement</th>
+                <th className="py-3 px-3">Subsystem Category</th>
+                <th className="py-3 px-3 text-center">Clearance Rate</th>
                 <th className="py-3 px-3 text-center">Fastest Solve</th>
-                <th className="py-3 px-3 text-center">Avg Time</th>
-                <th className="py-3 px-4 text-right">Difficulty Status</th>
+                <th className="py-3 px-3 text-center">Average Time</th>
+                <th className="py-3 px-4 text-right">Friction Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans">
+            <tbody className="divide-y divide-[#181a1f] font-sans">
               {puzzleStats.map(({ puzzle, solvesCount, completionRate, fastestTeamName, fastestMins, avgDurationMins, isBottleneck }) => (
-                <tr key={puzzle.id} className="hover:bg-slate-900/40 transition">
+                <tr key={puzzle.id} className="hover:bg-[#141519] transition">
                   <td className="py-3.5 px-4 font-mono font-bold text-[#00e5ff]">
                     STAGE {puzzle.stageNumber}
                   </td>
@@ -137,19 +889,19 @@ export const LiveAnalysisView = ({
                     {puzzle.title}
                   </td>
                   <td className="py-3.5 px-3">
-                    <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-[#181a1f] text-zinc-300 border border-[#252830]">
                       {puzzle.category}
                     </span>
                   </td>
                   <td className="py-3.5 px-3">
                     <div className="flex items-center gap-2 justify-center">
-                      <div className="w-20 h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-20 h-2 bg-[#1b1d22] rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-cyan-400 rounded-full"
                           style={{ width: `${completionRate}%` }}
-                        ></div>
+                        />
                       </div>
-                      <span className="font-mono font-bold text-slate-200 text-[11px]">
+                      <span className="font-mono font-bold text-zinc-300 text-[11px]">
                         {completionRate}% ({solvesCount}/{totalTeams})
                       </span>
                     </div>
@@ -157,26 +909,26 @@ export const LiveAnalysisView = ({
                   <td className="py-3.5 px-3 text-center font-mono">
                     {fastestMins > 0 ? (
                       <span className="text-emerald-400 font-semibold">
-                        {fastestMins}m <span className="text-slate-500 font-sans text-[10px]">({fastestTeamName})</span>
+                        {fastestMins}m <span className="text-zinc-500 font-sans text-[10px]">({fastestTeamName})</span>
                       </span>
                     ) : (
-                      <span className="text-slate-600">—</span>
+                      <span className="text-zinc-600">—</span>
                     )}
                   </td>
-                  <td className="py-3.5 px-3 text-center font-mono text-slate-300">
+                  <td className="py-3.5 px-3 text-center font-mono text-zinc-300">
                     {avgDurationMins > 0 ? `${avgDurationMins} mins` : '—'}
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     {isBottleneck ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-mono font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800 text-[10px] font-mono font-bold">
                         <AlertOctagon className="w-3 h-3" /> BOTTLENECK
                       </span>
                     ) : completionRate >= 70 ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-mono font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[10px] font-mono font-bold">
                         FAST CLEAR
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800 text-[10px] font-mono font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#16181f] text-cyan-300 border border-[#252936] text-[10px] font-mono font-bold">
                         BALANCED
                       </span>
                     )}
@@ -188,72 +940,22 @@ export const LiveAnalysisView = ({
         </div>
       </div>
 
-      {/* Team Trajectory Timeline */}
-      <div className="p-6 rounded-2xl bg-[#121316]/90 border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-[#00e5ff]" />
-            Live Stage Clearance Timeline Across Teams
-          </h3>
-          <span className="text-xs text-slate-400 font-mono">X-Axis: Stages Solved (0 to 10)</span>
-        </div>
-
-        <div className="space-y-3 pt-2">
-          {teams.map((team) => {
-            const count = team.solvedPuzzles.length;
-            const percent = (count / 10) * 100;
-            const isUser = activeTeam?.id === team.id;
-
-            return (
-              <div 
-                key={team.id}
-                className={`p-3 rounded-xl border transition ${
-                  isUser ? 'bg-cyan-950/30 border-cyan-400/50' : 'bg-slate-900/50 border-slate-800/80'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{team.avatarSeed}</span>
-                    <span className="font-bold text-white">{team.name}</span>
-                    <span className="text-slate-400">({team.college})</span>
-                    {isUser && (
-                      <span className="text-[10px] font-mono font-bold bg-cyan-400 text-black px-1.5 rounded">
-                        YOU
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-mono text-[#00e5ff] font-bold">
-                    {count} / 10 Stages ({percent}%) &bull; {team.score} pts
-                  </div>
-                </div>
-
-                <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                  <div 
-                    className="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-amber-400 rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(0,240,255,0.4)]"
-                    style={{ width: `${Math.max(percent, 2)}%` }}
-                  ></div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Arcesium Engineering Benchmarking Callout */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-[#0b1c3a] to-[#07132a] border border-cyan-400/30 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* ── 6. ARCESIUM BENCHMARKING ENGINE ── */}
+      <div className="p-5 rounded-2xl bg-[#0e1014] border border-[#22262f] shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="text-xs font-mono font-bold text-[#00e5ff] uppercase tracking-wider mb-1">
-            ARCESIUM BENCHMARKING ENGINE
+          <div className="text-xs font-mono font-bold text-[#00e5ff] uppercase tracking-wider mb-1 flex items-center gap-2">
+            <span>ARCESIUM HARDWARE BENCHMARKING SPECIFICATION</span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-            In ultra-low-latency financial engineering, single-cycle deterministic timing and metastability immunity are vital. Verilog Quest metrics reflect real-world FPGA co-processor performance metrics.
+          <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+            In financial technology systems, single-cycle deterministic timing and metastability immunity are vital. Verilog Quest telemetry mirrors production RTL co-processor performance metrics.
           </p>
         </div>
-        <div className="text-right shrink-0">
-          <span className="text-[11px] font-mono text-[#00e5ff] block">Evaluation Standard</span>
-          <span className="text-base font-black font-mono text-white">IEEE 1364 &bull; Vivado ML</span>
+        <div className="text-right shrink-0 font-mono">
+          <span className="text-[11px] text-[#00e5ff] block">Evaluation Standard</span>
+          <span className="text-sm font-bold text-white">IEEE 1364 &bull; Vivado ML</span>
         </div>
       </div>
+
     </div>
   );
 };

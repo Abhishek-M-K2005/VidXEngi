@@ -1,5 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 
+/**
+ * CyberCursor - Sodium Monochromatic Display (589nm Amber Instrumentation)
+ * Replaces high-saturation cyan/neon with a warm, authentic sodium-vapor / amber phosphor display.
+ * Characteristics:
+ * - Monochromatic sodium amber palette (#f59e0b, #fbbf24, #d97706, #fffbeb)
+ * - Compact, low-glare instrument reticle (no oversized neon blur)
+ * - Precision hardware crosshairs & tactile click ripples
+ */
 export const CyberCursor = () => {
   const [pos, setPos] = useState({ x: -100, y: -100 });
   const [targetPos, setTargetPos] = useState({ x: -100, y: -100 });
@@ -26,7 +34,7 @@ export const CyberCursor = () => {
       );
       setIsHovered(isInteractive);
 
-      // Update card-level CSS custom properties for spotlight effects
+      // Update card-level CSS custom properties for spotlight effects (sodium tone)
       const card = target.closest('.spotlight-card');
       if (card) {
         const rect = card.getBoundingClientRect();
@@ -39,16 +47,16 @@ export const CyberCursor = () => {
 
     const handleMouseDown = (e) => {
       setIsClicked(true);
-      // Create shockwave ripple
+      // Create quick sodium shockwave ripple
       const newRipple = {
         id: Date.now(),
         x: e.clientX,
         y: e.clientY
       };
-      setRipples((prev) => [...prev.slice(-3), newRipple]);
+      setRipples((prev) => [...prev.slice(-2), newRipple]);
       setTimeout(() => {
         setRipples((prev) => prev.filter((r) => r.id !== newRipple.id));
-      }, 600);
+      }, 450);
     };
 
     const handleMouseUp = () => {
@@ -79,14 +87,14 @@ export const CyberCursor = () => {
     };
   }, [isVisible]);
 
-  // Smooth lerp (linear interpolation) for cursor ring
+  // Tight, smooth interpolation for instrument reticle ring
   useEffect(() => {
     let currentX = pos.x;
     let currentY = pos.y;
 
     const followLoop = () => {
-      currentX += (targetPos.x - currentX) * 0.35;
-      currentY += (targetPos.y - currentY) * 0.35;
+      currentX += (targetPos.x - currentX) * 0.4;
+      currentY += (targetPos.y - currentY) * 0.4;
       setPos({ x: currentX, y: currentY });
       animRef.current = requestAnimationFrame(followLoop);
     };
@@ -102,157 +110,170 @@ export const CyberCursor = () => {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-      {/* 1. Large Atmospheric Glow Aura (Deep Violet & Electric Cyan) matching user image */}
+      
+      {/* 1. Subtle Sodium Ambient Aura (Warm amber phosphor, not neon cyan) */}
       <div
         className="absolute rounded-full transition-opacity duration-300"
         style={{
-          width: '320px',
-          height: '320px',
+          width: '160px',
+          height: '160px',
           left: `${targetPos.x}px`,
           top: `${targetPos.y}px`,
           transform: 'translate(-50%, -50%)',
           background: isHovered
-            ? 'radial-gradient(circle, rgba(0, 240, 255, 0.22) 0%, rgba(157, 78, 221, 0.18) 35%, rgba(6, 12, 32, 0.08) 65%, transparent 80%)'
-            : 'radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, rgba(157, 78, 221, 0.12) 35%, rgba(6, 12, 32, 0.05) 65%, transparent 80%)',
-          filter: 'blur(20px)',
+            ? 'radial-gradient(circle, rgba(245, 158, 11, 0.16) 0%, rgba(217, 119, 6, 0.08) 40%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(245, 158, 11, 0.09) 0%, rgba(217, 119, 6, 0.04) 40%, transparent 70%)',
+          filter: 'blur(16px)',
         }}
       />
 
-      {/* 2. Click Shockwave Ripples */}
+      {/* 2. Sodium Vapor Click Pulse */}
       {ripples.map((r) => (
         <div
           key={r.id}
-          className="absolute rounded-full border border-cyan-400 animate-ping opacity-75"
+          className="absolute rounded-full border border-amber-400/80 animate-ping"
           style={{
             left: `${r.x}px`,
             top: `${r.y}px`,
-            width: '60px',
-            height: '60px',
+            width: '40px',
+            height: '40px',
             transform: 'translate(-50%, -50%)',
-            boxShadow: '0 0 15px rgba(0, 240, 255, 0.8)'
+            boxShadow: '0 0 10px rgba(245, 158, 11, 0.6)'
           }}
         />
       ))}
 
-      {/* 3. The Custom Tactical Cursor HUD Reticle (Exact replica of user reference) */}
+      {/* 3. Sodium Instrument Reticle (Amber Phosphor CRT / Laser Gauging) */}
       <div
         className="absolute transition-transform duration-150 ease-out"
         style={{
           left: `${pos.x}px`,
           top: `${pos.y}px`,
-          transform: `translate(-50%, -50%) scale(${isClicked ? 0.88 : isHovered ? 1.25 : 1}) rotate(${isHovered ? '45deg' : '0deg'})`,
+          transform: `translate(-50%, -50%) scale(${isClicked ? 0.9 : isHovered ? 1.18 : 1}) rotate(${isHovered ? '45deg' : '0deg'})`,
         }}
       >
-        {/* SVG Tactical Reticle Ring & 4 Diagonal Amber Ticks */}
         <svg
-          width="48"
-          height="48"
-          viewBox="0 0 48 48"
+          width="40"
+          height="40"
+          viewBox="0 0 40 40"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="overflow-visible"
         >
-          {/* Inner radial cyan gradient glow */}
+          {/* Subtle inner sodium phosphor glow */}
           <circle
-            cx="24"
-            cy="24"
-            r="16"
-            fill="url(#inner-cyan-glow)"
+            cx="20"
+            cy="20"
+            r="12"
+            fill="url(#sodium-inner-glow)"
           />
 
-          {/* Cyan Circular Perimeter Ring */}
+          {/* Primary Sodium Reticle Ring (589nm Warm Amber) */}
           <circle
-            cx="24"
-            cy="24"
-            r="15"
-            stroke="#00f0ff"
+            cx="20"
+            cy="20"
+            r="12"
+            stroke="#f59e0b"
+            strokeWidth="1.4"
+            strokeOpacity="0.85"
+            style={{
+              filter: 'drop-shadow(0 0 3px rgba(245, 158, 11, 0.55))'
+            }}
+          />
+
+          {/* 4 Precision Diagonal Sodium Ticks (45° angles) */}
+          {/* Top-Right Tick */}
+          <line
+            x1="28.5"
+            y1="11.5"
+            x2="33.5"
+            y2="6.5"
+            stroke="#fbbf24"
             strokeWidth="1.8"
-            strokeOpacity="0.95"
-            className="drop-shadow-[0_0_8px_rgba(0,240,255,0.7)]"
-          />
-
-          {/* 4 Diagonal Amber/Orange Ticks at 45 degree angles (from user's image) */}
-          {/* Top-Right Tick (45 deg) */}
-          <line
-            x1="35"
-            y1="13"
-            x2="41"
-            y2="7"
-            stroke="#ffb703"
-            strokeWidth="2.2"
             strokeLinecap="round"
-            className="drop-shadow-[0_0_6px_rgba(255,183,3,0.8)]"
+            style={{
+              filter: 'drop-shadow(0 0 2px rgba(251, 191, 36, 0.6))'
+            }}
           />
 
-          {/* Top-Left Tick (135 deg) */}
+          {/* Top-Left Tick */}
           <line
-            x1="13"
-            y1="13"
-            x2="7"
-            y2="7"
-            stroke="#ffb703"
-            strokeWidth="2.2"
+            x1="11.5"
+            y1="11.5"
+            x2="6.5"
+            y2="6.5"
+            stroke="#fbbf24"
+            strokeWidth="1.8"
             strokeLinecap="round"
-            className="drop-shadow-[0_0_6px_rgba(255,183,3,0.8)]"
+            style={{
+              filter: 'drop-shadow(0 0 2px rgba(251, 191, 36, 0.6))'
+            }}
           />
 
-          {/* Bottom-Left Tick (225 deg) */}
+          {/* Bottom-Left Tick */}
           <line
-            x1="13"
-            y1="35"
-            x2="7"
-            y2="41"
-            stroke="#ffb703"
-            strokeWidth="2.2"
+            x1="11.5"
+            y1="28.5"
+            x2="6.5"
+            y2="33.5"
+            stroke="#fbbf24"
+            strokeWidth="1.8"
             strokeLinecap="round"
-            className="drop-shadow-[0_0_6px_rgba(255,183,3,0.8)]"
+            style={{
+              filter: 'drop-shadow(0 0 2px rgba(251, 191, 36, 0.6))'
+            }}
           />
 
-          {/* Bottom-Right Tick (315 deg) */}
+          {/* Bottom-Right Tick */}
           <line
-            x1="35"
-            y1="35"
-            x2="41"
-            y2="41"
-            stroke="#ffb703"
-            strokeWidth="2.2"
+            x1="28.5"
+            y1="28.5"
+            x2="33.5"
+            y2="33.5"
+            stroke="#fbbf24"
+            strokeWidth="1.8"
             strokeLinecap="round"
-            className="drop-shadow-[0_0_6px_rgba(255,183,3,0.8)]"
+            style={{
+              filter: 'drop-shadow(0 0 2px rgba(251, 191, 36, 0.6))'
+            }}
           />
 
-          {/* Center glowing white dot */}
+          {/* Center Sodium Core Dot */}
           <circle
-            cx="24"
-            cy="24"
-            r="3.2"
-            fill="#ffffff"
-            className="drop-shadow-[0_0_6px_#ffffff]"
+            cx="20"
+            cy="20"
+            r="2.2"
+            fill="#fffbeb"
+            style={{
+              filter: 'drop-shadow(0 0 3px rgba(245, 158, 11, 0.9))'
+            }}
           />
 
           <defs>
             <radialGradient
-              id="inner-cyan-glow"
+              id="sodium-inner-glow"
               cx="0"
               cy="0"
               r="1"
               gradientUnits="userSpaceOnUse"
-              gradientTransform="translate(24 24) rotate(90) scale(15)"
+              gradientTransform="translate(20 20) rotate(90) scale(12)"
             >
-              <stop stopColor="#00f0ff" stopOpacity="0.3" />
-              <stop offset="0.7" stopColor="#00f0ff" stopOpacity="0.1" />
-              <stop offset="1" stopColor="#00f0ff" stopOpacity="0" />
+              <stop stopColor="#f59e0b" stopOpacity="0.18" />
+              <stop offset="0.75" stopColor="#d97706" stopOpacity="0.06" />
+              <stop offset="1" stopColor="#b45309" stopOpacity="0" />
             </radialGradient>
           </defs>
         </svg>
       </div>
 
-      {/* 4. Instant Precise Dot Tracker (at exact target coordinates for precision feel) */}
+      {/* 4. Instant Precision Tracker Pin (Fine sodium-white pinpoint) */}
       <div
-        className="absolute w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_6px_#00f0ff]"
+        className="absolute w-1 h-1 rounded-full bg-[#fffbeb]"
         style={{
           left: `${targetPos.x}px`,
           top: `${targetPos.y}px`,
           transform: 'translate(-50%, -50%)',
+          boxShadow: '0 0 4px rgba(245, 158, 11, 0.85)'
         }}
       />
     </div>

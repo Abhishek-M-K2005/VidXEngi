@@ -148,7 +148,7 @@ export const HeroBanner = ({
 
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111215] border border-[#1e2025] text-amber-300">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Register before the 23rd!</span>
+            <span>Authorized Team Access Only</span>
           </div>
         </div>
 
@@ -281,7 +281,7 @@ export const HeroBanner = ({
             <div className="p-3 bg-[#111215] border-t border-[#1e2025] flex items-center justify-between text-xs text-zinc-400">
               <div className="flex items-center gap-2">
                 <QrCode className="w-4 h-4 text-amber-400" />
-                <span>Register before the 23rd!</span>
+                <span>25 Oct 2026 · NITK Surathkal</span>
               </div>
               <span className="text-[#00e5ff] font-semibold font-mono">
                 ACM Vidyut × Engineer '26

@@ -5,7 +5,8 @@ import {
   ExternalLink, 
   CheckCircle2, 
   Cpu, 
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { ArcesiumLogo } from './BrandLogos';
 
@@ -145,6 +146,30 @@ export const RulesView = () => {
           </div>
         </div>
 
+        {/* Anti-Cheat & Single Instance Policy */}
+        <div className="md:col-span-2 matte-card p-5 space-y-3 border-amber-500/30 bg-amber-950/10">
+          <h4 className="text-sm font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            Anti-Cheat &amp; Single Active Session Policy (Directive 4.1)
+          </h4>
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            To preserve fair competition, integrity of live decryption flags, and telemetry audits:
+          </p>
+          <ul className="space-y-1.5 text-xs text-zinc-300">
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span><strong>Strict 1 Device / 1 Tab Limit:</strong> A team login can only be active on exactly ONE device or browser tab at any instance.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span><strong>Automatic Disconnect &amp; Collision Lockout:</strong> Authenticating on another device or tab immediately terminates and locks the previous session in real time.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span><strong>Session Re-Claiming:</strong> If an active terminal is disconnected, team members can re-claim the session with their passcode or continue in public spectator mode.</span>
+            </li>
+          </ul>
+        </div>
       </div>
 
     </div>

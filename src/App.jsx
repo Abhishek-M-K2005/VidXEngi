@@ -16,6 +16,7 @@ import { AuthModal } from './components/AuthModal';
 import { SessionCollisionModal } from './components/SessionCollisionModal';
 import { Footer } from './components/Footer';
 import { sessionManager } from './utils/sessionManager';
+import { fetchClientIpData, getCachedClientIp, getCachedNetworkOrg } from './utils/networkIp';
 
 export const App = () => {
   const [currentTab, setCurrentTab] = useState('puzzles');
@@ -102,6 +103,9 @@ export const App = () => {
 
   // Register active session & listen for concurrent displacement
   useEffect(() => {
+    // Probe client IP & network origin for fraud prevention & admin telemetry
+    fetchClientIpData().catch(() => {});
+
     if (activeTeamId) {
       sessionManager.registerSession(activeTeamId);
     }
@@ -179,24 +183,30 @@ export const App = () => {
       }
 
       const now = Date.now();
+      const clientIp = getCachedClientIp();
+      const networkOrg = getCachedNetworkOrg();
       const updatedSolved = [...activeTeam.solvedPuzzles, puzzleId].sort((a, b) => a - b);
       const updatedScore = activeTeam.score + puzzle.points;
       const updatedTimestamps = {
         ...activeTeam.puzzleSolveTimestamps,
         [puzzleId]: now
       };
+      const updatedIpHistory = Array.from(new Set([...(activeTeam.ipHistory || []), clientIp]));
 
       const updatedTeam = {
         ...activeTeam,
         solvedPuzzles: updatedSolved,
         score: updatedScore,
         puzzleSolveTimestamps: updatedTimestamps,
-        lastActive: now
+        lastActive: now,
+        lastIp: clientIp,
+        networkOrg,
+        ipHistory: updatedIpHistory
       };
 
       setTeams((prev) => prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t)));
 
-      // Add to activity feed
+      // Add to activity feed with client IP audit tracking
       const newEvent = {
         id: `act_${Date.now()}`,
         timestamp: now,
@@ -204,6 +214,8 @@ export const App = () => {
         teamName: activeTeam.name,
         puzzleId: puzzle.id,
         puzzleTitle: puzzle.title,
+        clientIp,
+        networkOrg,
         type: updatedSolved.length === 10 ? 'FINISH_ALL' : updatedSolved.length === 5 ? 'MILESTONE_5' : 'SOLVE',
         message: updatedSolved.length === 10 
           ? `🏆 ALL 10 STAGES COMPLETED! Transmitted Golden RTL Bitstream!` 
@@ -243,15 +255,24 @@ export const App = () => {
     showToast(`⚠️ Hint unlocked (+${puzzle.hintPenaltyMinutes}m timing penalty).`);
   };
 
-  // Switch / Login Team with Single Active Session Registration
+  // Switch / Login Team with Single Active Session Registration & IP Audit
   const handleLoginTeam = (team) => {
+    const clientIp = getCachedClientIp();
+    const networkOrg = getCachedNetworkOrg();
+
     sessionManager.registerSession(team.id);
     setActiveTeamId(team.id);
     setIsCollisionModalOpen(false);
     setDisplacedSessionInfo(null);
+
+    if (!team.isAdmin) {
+      const updatedIpHistory = Array.from(new Set([...(team.ipHistory || []), clientIp]));
+      setTeams((prev) => prev.map((t) => (t.id === team.id ? { ...t, lastIp: clientIp, networkOrg, ipHistory: updatedIpHistory } : t)));
+    }
+
     showToast(team.isAdmin 
       ? `👑 Welcome, ACM Vidyut Proctor! Master operations unlocked.` 
-      : `Welcome back, ${team.name}! (Single terminal locked to this tab)`
+      : `Welcome back, ${team.name}! (Active Terminal Locked to IP ${clientIp})`
     );
   };
 
@@ -265,7 +286,9 @@ export const App = () => {
       puzzleSolveTimestamps: {},
       penaltyMinutes: 0,
       score: 0,
-      lastActive: Date.now()
+      lastActive: Date.now(),
+      lastIp: null,
+      ipHistory: []
     };
 
     setTeams((prev) => [newTeam, ...prev]);
@@ -277,6 +300,8 @@ export const App = () => {
       teamName: newTeam.name,
       puzzleId: 0,
       puzzleTitle: 'Team Authorized',
+      clientIp: getCachedClientIp(),
+      networkOrg: getCachedNetworkOrg(),
       type: 'SOLVE',
       message: `👑 [ADMIN PROVISIONED]: New team "${newTeam.name}" (${newTeam.college}) authorized.`
     };

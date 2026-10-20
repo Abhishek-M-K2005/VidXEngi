@@ -17,6 +17,8 @@ const STORAGE_KEY_TEAM_SESSIONS = 'vq_team_sessions';
 const STORAGE_KEY_DEVICE_ID = 'vq_device_id';
 const CHANNEL_NAME = 'vq_session_integrity_channel';
 
+import { getCachedClientIp, getCachedNetworkOrg } from './networkIp';
+
 // Generate or retrieve persistent Device ID
 export const getDeviceId = () => {
   if (typeof window === 'undefined') return 'server';
@@ -188,12 +190,17 @@ class SessionManager {
    */
   registerSession(teamId) {
     const newSessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const clientIp = getCachedClientIp();
+    const networkOrg = getCachedNetworkOrg();
+
     const sessionData = {
       teamId,
       sessionId: newSessionId,
       tabId: this.tabId,
       deviceId: this.deviceId,
       deviceLabel: this.deviceLabel,
+      clientIp,
+      networkOrg,
       loginTime: Date.now(),
       lastHeartbeat: Date.now()
     };

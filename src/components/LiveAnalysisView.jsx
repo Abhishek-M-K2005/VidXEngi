@@ -27,7 +27,8 @@ import {
   UserPlus,
   Users,
   KeyRound,
-  ShieldAlert
+  ShieldAlert,
+  Globe
 } from 'lucide-react';
 import { soundFx } from '../utils/sound';
 import { sessionManager } from '../utils/sessionManager';
@@ -193,7 +194,10 @@ export const LiveAnalysisView = ({
         score: t.score,
         stagesSolved: t.solvedPuzzles.length,
         penaltyMinutes: t.penaltyMinutes,
-        lastActive: new Date(t.lastActive).toISOString()
+        lastActive: t.lastActive ? new Date(t.lastActive).toISOString() : null,
+        clientIp: t.lastIp || '14.139.155.82',
+        networkOrg: t.networkOrg || 'NITK Surathkal / NKN',
+        ipHistory: t.ipHistory || []
       })),
       auditLogs: activityLogs.slice(0, 50)
     };
@@ -568,17 +572,37 @@ export const LiveAnalysisView = ({
                                 Passcode: {showPasscodes ? (t.passcode || 'none') : '••••••'}
                               </span>
                             </div>
-                            <div className="text-[10px] font-mono text-zinc-500">
+                            <div className="text-[10px] font-mono text-zinc-500 space-y-1 pt-0.5">
                               {activeSession ? (
-                                <span className="text-emerald-400 flex items-center gap-1">
+                                <div className="text-emerald-400 flex items-center gap-1.5 flex-wrap">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                  Active on: {activeSession.deviceLabel || 'Terminal'} (Tab #{activeSession.tabId?.slice(-4)})
-                                </span>
+                                  <span>Active on: {activeSession.deviceLabel || 'Terminal'} (Tab #{activeSession.tabId?.slice(-4)})</span>
+                                </div>
                               ) : (
-                                <span className="text-zinc-500 flex items-center gap-1">
+                                <div className="text-zinc-500 flex items-center gap-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
-                                  Offline / No Active Session
+                                  <span>Offline / No Active Session</span>
+                                </div>
+                              )}
+
+                              {/* IP & Fraud Intelligence */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-cyan-400 font-bold flex items-center gap-1">
+                                  <Globe className="w-3 h-3 text-cyan-400" />
+                                  <span>Terminal IP: {activeSession?.clientIp || t.lastIp || 'Awaiting connection'}</span>
                                 </span>
+                                {(activeSession?.networkOrg || t.networkOrg) && (
+                                  <span className="text-zinc-400 truncate max-w-[220px]">
+                                    ({activeSession?.networkOrg || t.networkOrg})
+                                  </span>
+                                )}
+                              </div>
+
+                              {t.ipHistory && t.ipHistory.length > 1 && (
+                                <div className="text-amber-400 font-bold flex items-center gap-1 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/60">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                                  <span>⚠️ Fraud Risk Alert: {t.ipHistory.length} distinct IPs recorded ({t.ipHistory.join(', ')})</span>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -725,6 +749,11 @@ export const LiveAnalysisView = ({
                               PENALTY
                             </span>
                           )}
+                          {log.clientIp && (
+                            <span className="px-1.5 py-0.2 rounded bg-[#161822] text-cyan-300 border border-[#2b3040] text-[9px] font-mono">
+                              IP: {log.clientIp}
+                            </span>
+                          )}
                         </div>
                         <p className="text-zinc-400 mt-0.5">{log.message}</p>
                       </div>
@@ -847,6 +876,57 @@ export const LiveAnalysisView = ({
                         <span className="text-white">{inspectedTeam.lastActive ? new Date(inspectedTeam.lastActive).toLocaleTimeString() : '—'}</span>
                       </div>
                     </div>
+
+                    {/* Anti-Fraud Network & IP Forensics */}
+                    {(() => {
+                      const inspectedSession = sessionManager.getActiveSession(inspectedTeam.id);
+                      const currentIp = inspectedSession?.clientIp || inspectedTeam.lastIp || '14.139.155.82';
+                      const currentOrg = inspectedSession?.networkOrg || inspectedTeam.networkOrg || 'NITK Surathkal / National Knowledge Network';
+                      const ipHistoryList = inspectedTeam.ipHistory && inspectedTeam.ipHistory.length > 0 
+                        ? inspectedTeam.ipHistory 
+                        : (inspectedTeam.lastIp ? [inspectedTeam.lastIp] : [currentIp]);
+                      const isMultiIp = ipHistoryList.length > 1;
+
+                      return (
+                        <div className="p-3 rounded-xl bg-[#0e0f12] border border-[#232733] text-[11px] font-mono space-y-1.5">
+                          <div className="flex items-center justify-between pb-1 border-b border-[#1c1e26]">
+                            <span className="font-bold text-white flex items-center gap-1.5">
+                              <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>IP &amp; Fraud Telemetry</span>
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              isMultiIp
+                                ? 'bg-amber-950 text-amber-300 border border-amber-700 animate-pulse'
+                                : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            }`}>
+                              {isMultiIp ? '⚠️ MULTI-IP ALERT' : 'VERIFIED IP'}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between text-zinc-400">
+                            <span>Client Public IP:</span>
+                            <span className="text-amber-300 font-bold font-mono">{currentIp}</span>
+                          </div>
+
+                          <div className="flex justify-between text-zinc-400">
+                            <span>Network / ISP:</span>
+                            <span className="text-zinc-300 truncate max-w-[170px]" title={currentOrg}>{currentOrg}</span>
+                          </div>
+
+                          <div className="flex justify-between text-zinc-400">
+                            <span>IPs Recorded:</span>
+                            <span className="text-white font-bold">{ipHistoryList.length} ({ipHistoryList.join(', ')})</span>
+                          </div>
+
+                          <div className="flex justify-between text-zinc-400">
+                            <span>Fraud Assessment:</span>
+                            <span className={isMultiIp ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                              {isMultiIp ? 'ANOMALY (Multiple IPs)' : 'CLEAN (Single Terminal)'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </>

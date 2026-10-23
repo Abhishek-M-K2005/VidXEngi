@@ -17,7 +17,7 @@ import { SessionCollisionModal } from './components/SessionCollisionModal';
 import { Footer } from './components/Footer';
 import { sessionManager } from './utils/sessionManager';
 import { fetchClientIpData, getCachedClientIp, getCachedNetworkOrg } from './utils/networkIp';
-import { cloudSync, normalizeTeams } from './utils/cloudSync';
+import { cloudSync, normalizeTeams, mergeTeams } from './utils/cloudSync';
 
 export const App = () => {
   const [currentTab, setCurrentTab] = useState('puzzles');
@@ -146,22 +146,51 @@ export const App = () => {
   useEffect(() => {
     // 1. Initial fetch from cloud relay
     cloudSync.fetchLatestTeams().then((cloudTeams) => {
-      if (Array.isArray(cloudTeams)) {
-        setTeams(normalizeTeams(cloudTeams));
+      if (Array.isArray(cloudTeams) && cloudTeams.length > 0) {
+        setTeams((prev) => mergeTeams(prev, cloudTeams));
       }
     });
 
-    // 2. Real-time listener for incoming additions/deletions from any admin device
-    const unsubscribeSync = cloudSync.subscribe((incomingTeams) => {
+    // 2. Real-time listener for incoming progress, solves, and roster updates from any device
+    const unsubscribeSync = cloudSync.subscribe((incomingTeams, metadata) => {
       if (Array.isArray(incomingTeams)) {
-        setTeams(normalizeTeams(incomingTeams));
+        const cleanIncoming = normalizeTeams(incomingTeams);
+        setTeams((prev) => {
+          const merged = mergeTeams(prev, cleanIncoming, metadata?.source);
+          localStorage.setItem('vq_teams_data', JSON.stringify(merged));
+          localStorage.setItem('vq_prod_teams_v1', JSON.stringify(merged));
+          return merged;
+        });
+
+        // Broadcast notification if another team solved a puzzle
+        if (metadata && metadata.source === 'TEAM_SOLVE' && metadata.teamId !== activeTeamId) {
+          const newEvent = {
+            id: `act_${Date.now()}`,
+            timestamp: metadata.timestamp || Date.now(),
+            teamId: metadata.teamId,
+            teamName: metadata.teamName || 'Competitor',
+            puzzleId: metadata.puzzleId,
+            puzzleTitle: metadata.puzzleTitle,
+            type: metadata.isAllSolved ? 'FINISH_ALL' : 'SOLVE',
+            message: metadata.isAllSolved
+              ? `[QUALIFIED] ${metadata.teamName || 'Team'} solved all 5 puzzles & unlocked Round 1: GENOME-X!`
+              : `Decrypted Stage 0${metadata.puzzleId} (${metadata.puzzleTitle})! Score: +${metadata.points || 0} pts`
+          };
+          setActivityLogs((prev) => [newEvent, ...prev.slice(0, 30)]);
+          showToast(
+            metadata.isAllSolved
+              ? `[QUALIFIED] ${metadata.teamName} solved all 5 stages!`
+              : `Live Contest Update: ${metadata.teamName} decrypted Stage 0${metadata.puzzleId}!`
+          );
+          soundFx.playZap();
+        }
       }
     });
 
     return () => {
       unsubscribeSync();
     };
-  }, []);
+  }, [activeTeamId]);
 
   // Persist teams to localStorage
   useEffect(() => {
@@ -262,7 +291,21 @@ export const App = () => {
         ...(completedAllAt ? { completedAllAt } : {})
       };
 
-      setTeams((prev) => prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t)));
+      setTeams((prev) => {
+        const next = prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t));
+        localStorage.setItem('vq_teams_data', JSON.stringify(next));
+        localStorage.setItem('vq_prod_teams_v1', JSON.stringify(next));
+        cloudSync.publishTeams(next, {
+          source: 'TEAM_SOLVE',
+          teamId: activeTeam.id,
+          teamName: activeTeam.name,
+          puzzleId: puzzle.id,
+          puzzleTitle: puzzle.title,
+          points: puzzle.points,
+          isAllSolved
+        });
+        return next;
+      });
 
       // Add to activity feed with client IP audit tracking
       const newEvent = {
@@ -309,10 +352,20 @@ export const App = () => {
 
     const updatedTeam = {
       ...activeTeam,
-      penaltyMinutes: activeTeam.penaltyMinutes + puzzle.hintPenaltyMinutes
+      penaltyMinutes: (activeTeam.penaltyMinutes || 0) + puzzle.hintPenaltyMinutes
     };
 
-    setTeams((prev) => prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t)));
+    setTeams((prev) => {
+      const next = prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t));
+      localStorage.setItem('vq_teams_data', JSON.stringify(next));
+      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(next));
+      cloudSync.publishTeams(next, {
+        source: 'TEAM_HINT',
+        teamId: activeTeam.id,
+        puzzleId
+      });
+      return next;
+    });
 
     showToast(`Hint unlocked (+${puzzle.hintPenaltyMinutes}m timing penalty).`);
   };
@@ -357,7 +410,7 @@ export const App = () => {
       const updated = [newTeam, ...prev];
       localStorage.setItem('vq_teams_data', JSON.stringify(updated));
       localStorage.setItem('vq_prod_teams_v1', JSON.stringify(updated));
-      cloudSync.publishTeams(updated);
+      cloudSync.publishTeams(updated, { source: 'ADMIN_PROVISION' });
       return updated;
     });
 
@@ -387,7 +440,7 @@ export const App = () => {
       const next = prev.filter((t) => t.id !== teamId);
       localStorage.setItem('vq_teams_data', JSON.stringify(next));
       localStorage.setItem('vq_prod_teams_v1', JSON.stringify(next));
-      cloudSync.publishTeams(next);
+      cloudSync.publishTeams(next, { source: 'ADMIN_DELETE' });
       return next;
     });
     showToast(`Team "${teamToDelete.name}" removed and synced.`);
@@ -399,7 +452,7 @@ export const App = () => {
     setTeams([]);
     localStorage.setItem('vq_teams_data', JSON.stringify([]));
     localStorage.setItem('vq_prod_teams_v1', JSON.stringify([]));
-    cloudSync.publishTeams([]);
+    cloudSync.publishTeams([], { source: 'ADMIN_CLEAR' });
     showToast('All participating teams cleared and synced across devices.');
   };
 
@@ -408,7 +461,7 @@ export const App = () => {
     setTeams(SAMPLE_TEAMS);
     localStorage.setItem('vq_teams_data', JSON.stringify(SAMPLE_TEAMS));
     localStorage.setItem('vq_prod_teams_v1', JSON.stringify(SAMPLE_TEAMS));
-    cloudSync.publishTeams(SAMPLE_TEAMS);
+    cloudSync.publishTeams(SAMPLE_TEAMS, { source: 'ADMIN_PROVISION' });
     showToast('Loaded and synced 10 sample testing teams.');
   };
 

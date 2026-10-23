@@ -36,6 +36,61 @@ export const normalizeTeams = (teams) => {
   return teams.map(normalizeTeam).filter(Boolean);
 };
 
+export const mergeTeams = (localTeams, incomingTeams, source = 'SYNC') => {
+  if (!Array.isArray(incomingTeams)) return localTeams || [];
+  if (!Array.isArray(localTeams) || localTeams.length === 0) return incomingTeams;
+
+  // If Admin explicitly altered the roster structure, use the authoritative roster
+  if (source === 'ADMIN_CLEAR' || source === 'ADMIN_DELETE' || source === 'ADMIN_PROVISION') {
+    return incomingTeams;
+  }
+
+  // Progress/Solve sync: merge progress so no device loses its own solves
+  const localMap = new Map(localTeams.map((t) => [t.id, t]));
+
+  const merged = incomingTeams.map((inTeam) => {
+    const loc = localMap.get(inTeam.id);
+    if (!loc) return inTeam;
+
+    const locSolved = Array.isArray(loc.solvedPuzzles) ? loc.solvedPuzzles : [];
+    const inSolved = Array.isArray(inTeam.solvedPuzzles) ? inTeam.solvedPuzzles : [];
+    const combinedSolved = Array.from(new Set([...locSolved, ...inSolved])).sort((a, b) => a - b);
+
+    const combinedTimestamps = {
+      ...(loc.puzzleSolveTimestamps || {}),
+      ...(inTeam.puzzleSolveTimestamps || {})
+    };
+
+    let completedAllAt = null;
+    if (combinedSolved.length === 5) {
+      const candidates = [loc.completedAllAt, inTeam.completedAllAt].filter(Boolean);
+      if (candidates.length > 0) {
+        completedAllAt = Math.min(...candidates);
+      } else {
+        completedAllAt = Date.now();
+      }
+    }
+
+    const maxScore = Math.max(loc.score || 0, inTeam.score || 0);
+    const maxPenalty = Math.max(loc.penaltyMinutes || 0, inTeam.penaltyMinutes || 0);
+
+    return {
+      ...inTeam,
+      name: inTeam.name || loc.name,
+      college: inTeam.college || loc.college,
+      passcode: inTeam.passcode || loc.passcode,
+      solvedPuzzles: combinedSolved,
+      puzzleSolveTimestamps: combinedTimestamps,
+      score: maxScore,
+      penaltyMinutes: maxPenalty,
+      completedAllAt: completedAllAt || inTeam.completedAllAt || loc.completedAllAt,
+      lastActive: Math.max(loc.lastActive || 0, inTeam.lastActive || 0)
+    };
+  });
+
+  return merged;
+};
+
 class CloudSyncManager {
   constructor() {
     this.eventSource = null;
@@ -50,13 +105,15 @@ class CloudSyncManager {
    */
   getTeamsSignature(teams) {
     if (!Array.isArray(teams)) return '';
-    return teams.map((t) => `${t.id}:${t.name}:${t.passcode || ''}:${(t.solvedPuzzles || []).length}`).join('|');
+    return teams.map((t) => 
+      `${t.id}:${t.name}:${t.passcode || ''}:${(t.solvedPuzzles || []).join(',')}:${t.score || 0}:${t.penaltyMinutes || 0}:${t.completedAllAt || 0}`
+    ).join('|');
   }
 
   /**
    * Publish updated teams to the cloud so all other devices receive them
    */
-  async publishTeams(teams) {
+  async publishTeams(teams, metadata = {}) {
     const cleanTeams = normalizeTeams(teams);
     const now = Date.now();
     this.lastSyncTimestamp = now;
@@ -64,7 +121,13 @@ class CloudSyncManager {
 
     const payload = {
       type: 'TEAMS_UPDATE',
-      source: 'ADMIN_PROVISION',
+      source: metadata.source || 'ADMIN_PROVISION',
+      teamId: metadata.teamId || null,
+      teamName: metadata.teamName || null,
+      puzzleId: metadata.puzzleId || null,
+      puzzleTitle: metadata.puzzleTitle || null,
+      points: metadata.points || null,
+      isAllSolved: Boolean(metadata.isAllSolved),
       timestamp: now,
       teams: cleanTeams
     };
@@ -74,7 +137,7 @@ class CloudSyncManager {
         await fetch(SYNC_URL, {
           method: 'POST',
           headers: {
-            'Title': 'Verilog Quest Teams Update',
+            'Title': metadata.source === 'TEAM_SOLVE' ? 'Contest Solve Event' : 'Verilog Quest Teams Update',
             'Priority': 'urgent'
           },
           body: JSON.stringify(payload)
@@ -155,7 +218,7 @@ class CloudSyncManager {
                   this.lastSyncTimestamp = body.timestamp || Date.now();
                   this.listeners.forEach((callback) => {
                     try {
-                      callback(incomingClean);
+                      callback(incomingClean, body);
                     } catch (e) {
                       console.error('[CloudSync] Listener error:', e);
                     }

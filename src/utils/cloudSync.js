@@ -8,6 +8,34 @@
 const SYNC_TOPIC = 'vidxengi_vq26_teams_hub';
 const SYNC_URL = `https://ntfy.sh/${SYNC_TOPIC}`;
 
+export const normalizeTeam = (t) => {
+  if (!t || typeof t !== 'object') return null;
+  return {
+    id: t.id || `team_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    name: t.name || 'Team Profile',
+    callsign: t.callsign || t.name || 'T00',
+    college: t.college || 'Engineering Institute',
+    members: Array.isArray(t.members) ? t.members : [],
+    passcode: t.passcode ? String(t.passcode) : '',
+    solvedPuzzles: Array.isArray(t.solvedPuzzles) ? t.solvedPuzzles : [],
+    puzzleSolveTimestamps: (t.puzzleSolveTimestamps && typeof t.puzzleSolveTimestamps === 'object') ? t.puzzleSolveTimestamps : {},
+    penaltyMinutes: typeof t.penaltyMinutes === 'number' ? t.penaltyMinutes : 0,
+    score: typeof t.score === 'number' ? t.score : 0,
+    avatarSeed: t.avatarSeed || 'CORE',
+    lastActive: typeof t.lastActive === 'number' ? t.lastActive : Date.now(),
+    completedAllAt: t.completedAllAt || null,
+    lastIp: t.lastIp || null,
+    networkOrg: t.networkOrg || null,
+    ipHistory: Array.isArray(t.ipHistory) ? t.ipHistory : [],
+    isAdmin: Boolean(t.isAdmin)
+  };
+};
+
+export const normalizeTeams = (teams) => {
+  if (!Array.isArray(teams)) return [];
+  return teams.map(normalizeTeam).filter(Boolean);
+};
+
 class CloudSyncManager {
   constructor() {
     this.eventSource = null;
@@ -29,16 +57,16 @@ class CloudSyncManager {
    * Publish updated teams to the cloud so all other devices receive them
    */
   async publishTeams(teams) {
-    if (!Array.isArray(teams)) return;
+    const cleanTeams = normalizeTeams(teams);
     const now = Date.now();
     this.lastSyncTimestamp = now;
-    this.lastTeamsHash = this.getTeamsSignature(teams);
+    this.lastTeamsHash = this.getTeamsSignature(cleanTeams);
 
     const payload = {
       type: 'TEAMS_UPDATE',
       source: 'ADMIN_PROVISION',
       timestamp: now,
-      teams
+      teams: cleanTeams
     };
 
     try {
@@ -82,9 +110,10 @@ class CloudSyncManager {
           if (item && item.message) {
             const body = JSON.parse(item.message);
             if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
+              const cleanTeams = normalizeTeams(body.teams);
               this.lastSyncTimestamp = body.timestamp || Date.now();
-              this.lastTeamsHash = this.getTeamsSignature(body.teams);
-              return body.teams;
+              this.lastTeamsHash = this.getTeamsSignature(cleanTeams);
+              return cleanTeams;
             }
           }
         } catch {
@@ -118,14 +147,15 @@ class CloudSyncManager {
             if (item && item.message) {
               const body = JSON.parse(item.message);
               if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
-                const incomingHash = this.getTeamsSignature(body.teams);
+                const incomingClean = normalizeTeams(body.teams);
+                const incomingHash = this.getTeamsSignature(incomingClean);
                 // Avoid redundant updates if hash matches what we already published
                 if (incomingHash !== this.lastTeamsHash) {
                   this.lastTeamsHash = incomingHash;
                   this.lastSyncTimestamp = body.timestamp || Date.now();
                   this.listeners.forEach((callback) => {
                     try {
-                      callback(body.teams);
+                      callback(incomingClean);
                     } catch (e) {
                       console.error('[CloudSync] Listener error:', e);
                     }

@@ -44,7 +44,8 @@ export const HeroBanner = ({
     return () => clearInterval(id);
   }, []);
 
-  const progress = Math.round((solvedCount / totalPuzzles) * 100);
+  const safeTotal = totalPuzzles > 0 ? totalPuzzles : 5;
+  const progress = Math.round(((solvedCount || 0) / safeTotal) * 100);
 
   return (
     <section className="relative overflow-hidden bg-[#0a0b0d] border-b border-[#1a1b1f]">

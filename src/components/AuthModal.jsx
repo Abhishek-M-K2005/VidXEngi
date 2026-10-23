@@ -309,7 +309,7 @@ export const AuthModal = ({
                       </span>
                     </div>
                     <p className="text-[10px] text-zinc-400 truncate">
-                      {matchedTeam.college} &bull; {matchedTeam.solvedPuzzles.length} Solved
+                      {matchedTeam.college} &bull; {(matchedTeam.solvedPuzzles || []).length} Solved
                     </p>
                   </div>
                 </div>
@@ -365,7 +365,7 @@ export const AuthModal = ({
                   >
                     {participantTeams.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({t.college}) &mdash; {t.solvedPuzzles.length} Solved
+                        {t.name} ({t.college}) &mdash; {(t.solvedPuzzles || []).length} Solved
                       </option>
                     ))}
                   </select>

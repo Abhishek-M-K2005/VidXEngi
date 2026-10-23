@@ -269,7 +269,7 @@ endmodule
               {progressPercent}%
             </div>
             <div className="text-xs text-slate-300 font-medium">
-              {solvedCount} of {puzzles.length} Puzzles Solved
+              {solvedCount} of {puzzles?.length || 5} Puzzles Solved
             </div>
             <div className="w-full h-2 bg-slate-900 rounded-full mt-2 overflow-hidden border border-slate-700">
               <div 

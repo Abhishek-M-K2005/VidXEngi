@@ -101,10 +101,11 @@ export const LiveAnalysisView = ({
 
   const leaderTeam = competingTeams.length > 0 
     ? [...competingTeams].sort((a, b) => {
-        const aCount = a.solvedPuzzles.length;
-        const bCount = b.solvedPuzzles.length;
-        const isACompleted = aCount === puzzles.length;
-        const isBCompleted = bCount === puzzles.length;
+        const aCount = (a?.solvedPuzzles || []).length;
+        const bCount = (b?.solvedPuzzles || []).length;
+        const totalPuzzlesCount = puzzles?.length || 5;
+        const isACompleted = aCount === totalPuzzlesCount;
+        const isBCompleted = bCount === totalPuzzlesCount;
 
         if (isACompleted && isBCompleted) {
           const aTime = getTeamCompletionTime(a);
@@ -112,8 +113,8 @@ export const LiveAnalysisView = ({
           if (aTime && bTime && aTime !== bTime) {
             return aTime - bTime;
           }
-          if (b.score !== a.score) return b.score - a.score;
-          return a.penaltyMinutes - b.penaltyMinutes;
+          if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+          return (a.penaltyMinutes || 0) - (b.penaltyMinutes || 0);
         }
 
         if (isACompleted) return -1;
@@ -125,21 +126,21 @@ export const LiveAnalysisView = ({
         if (aLastTime && bLastTime && aLastTime !== bLastTime) {
           return aLastTime - bLastTime;
         }
-        if (b.score !== a.score) return b.score - a.score;
-        return a.penaltyMinutes - b.penaltyMinutes;
+        if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+        return (a.penaltyMinutes || 0) - (b.penaltyMinutes || 0);
       })[0]
     : null;
-  const genomeXQualifiedTeams = competingTeams.filter((t) => t.solvedPuzzles.length === puzzles.length);
+  const genomeXQualifiedTeams = competingTeams.filter((t) => (t.solvedPuzzles || []).length === (puzzles?.length || 5));
   const genomeXUnlockRate = totalTeams > 0 ? Math.round((genomeXQualifiedTeams.length / totalTeams) * 100) : 0;
 
   // Compute global average solve duration dynamically
   let globalTotalDurationMs = 0;
   let globalSolvesCount = 0;
   competingTeams.forEach((t) => {
-    t.solvedPuzzles.forEach((pId) => {
-      const ts = t.puzzleSolveTimestamps[pId];
+    (t.solvedPuzzles || []).forEach((pId) => {
+      const ts = (t.puzzleSolveTimestamps || {})[pId];
       if (ts) {
-        const prevTs = pId === 1 ? ts - 15 * 60 * 1000 : (t.puzzleSolveTimestamps[pId - 1] || ts - 20 * 60 * 1000);
+        const prevTs = pId === 1 ? ts - 15 * 60 * 1000 : ((t.puzzleSolveTimestamps || {})[pId - 1] || ts - 20 * 60 * 1000);
         globalTotalDurationMs += Math.max(ts - prevTs, 3 * 60 * 1000);
         globalSolvesCount++;
       }

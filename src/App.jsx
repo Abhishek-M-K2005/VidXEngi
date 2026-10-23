@@ -17,7 +17,7 @@ import { SessionCollisionModal } from './components/SessionCollisionModal';
 import { Footer } from './components/Footer';
 import { sessionManager } from './utils/sessionManager';
 import { fetchClientIpData, getCachedClientIp, getCachedNetworkOrg } from './utils/networkIp';
-import { cloudSync } from './utils/cloudSync';
+import { cloudSync, normalizeTeams } from './utils/cloudSync';
 
 export const App = () => {
   const [currentTab, setCurrentTab] = useState('puzzles');
@@ -40,12 +40,12 @@ export const App = () => {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            // Filter out legacy dummy demo teams
+            // Filter out legacy dummy demo teams and any test objects
             const DEMO_IDS = [
               'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
-              'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
+              'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers', 'test_team'
             ];
-            return parsed.filter((t) => !DEMO_IDS.includes(t.id));
+            return normalizeTeams(parsed.filter((t) => !DEMO_IDS.includes(t.id)));
           }
         } catch {
           // fallback
@@ -59,14 +59,14 @@ export const App = () => {
           if (Array.isArray(parsed)) {
             const DEMO_IDS = [
               'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
-              'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
+              'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers', 'test_team'
             ];
-            return parsed.filter((t) => !DEMO_IDS.includes(t.id));
+            return normalizeTeams(parsed.filter((t) => !DEMO_IDS.includes(t.id)));
           }
         } catch {}
       }
     }
-    return INITIAL_TEAMS;
+    return normalizeTeams(INITIAL_TEAMS);
   });
 
   // Current logged in team id (starts null in production for unauthenticated visitors)
@@ -146,15 +146,15 @@ export const App = () => {
   useEffect(() => {
     // 1. Initial fetch from cloud relay
     cloudSync.fetchLatestTeams().then((cloudTeams) => {
-      if (Array.isArray(cloudTeams) && cloudTeams.length > 0) {
-        setTeams(cloudTeams);
+      if (Array.isArray(cloudTeams)) {
+        setTeams(normalizeTeams(cloudTeams));
       }
     });
 
     // 2. Real-time listener for incoming additions/deletions from any admin device
     const unsubscribeSync = cloudSync.subscribe((incomingTeams) => {
       if (Array.isArray(incomingTeams)) {
-        setTeams(incomingTeams);
+        setTeams(normalizeTeams(incomingTeams));
       }
     });
 
@@ -416,11 +416,12 @@ export const App = () => {
   const handleManualSyncTeams = async () => {
     showToast('Syncing latest official teams from cloud relay...');
     const latest = await cloudSync.fetchLatestTeams();
-    if (Array.isArray(latest) && latest.length > 0) {
-      setTeams(latest);
-      localStorage.setItem('vq_teams_data', JSON.stringify(latest));
-      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(latest));
-      showToast(`Roster synchronized! Loaded ${latest.length} team(s).`);
+    if (Array.isArray(latest)) {
+      const clean = normalizeTeams(latest);
+      setTeams(clean);
+      localStorage.setItem('vq_teams_data', JSON.stringify(clean));
+      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(clean));
+      showToast(`Roster synchronized! Loaded ${clean.length} team(s).`);
     } else {
       showToast('Roster is already synchronized with latest cloud broadcast.');
     }

@@ -14,10 +14,11 @@ export const LeaderboardView = ({
   const [selectedCollege, setSelectedCollege] = useState('ALL');
 
   // Only competing student teams appear on the public leaderboard
-  const competingTeams = teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut');
+  const competingTeams = (teams || []).filter((t) => t && !t.isAdmin && t.id !== 'admin_vidyut');
 
   // Get the definitive timestamp when a team completed all 5 puzzles (or their last solve)
   const getTeamCompletionTime = (t) => {
+    if (!t) return 0;
     if (t.completedAllAt) return t.completedAllAt;
     if (t.puzzleSolveTimestamps && t.puzzleSolveTimestamps[5]) return t.puzzleSolveTimestamps[5];
     const vals = Object.values(t.puzzleSolveTimestamps || {});
@@ -28,10 +29,11 @@ export const LeaderboardView = ({
   // 1. Teams who solved all 5 puzzles are strictly ranked by completion time (earliest completed is on top!)
   // 2. Teams with fewer puzzles are ranked by solved count (e.g. 4 > 3 > 2), then earliest solve time.
   const sortedTeams = [...competingTeams].sort((a, b) => {
-    const aSolvedCount = a.solvedPuzzles.length;
-    const bSolvedCount = b.solvedPuzzles.length;
-    const isACompleted = aSolvedCount === puzzles.length;
-    const isBCompleted = bSolvedCount === puzzles.length;
+    const aSolvedCount = (a?.solvedPuzzles || []).length;
+    const bSolvedCount = (b?.solvedPuzzles || []).length;
+    const totalPuzzlesCount = puzzles?.length || 5;
+    const isACompleted = aSolvedCount === totalPuzzlesCount;
+    const isBCompleted = bSolvedCount === totalPuzzlesCount;
 
     // Both completed all 5 puzzles: one who completed early MUST be on top!
     if (isACompleted && isBCompleted) {
@@ -40,8 +42,8 @@ export const LeaderboardView = ({
       if (aTime && bTime && aTime !== bTime) {
         return aTime - bTime; // Earlier timestamp comes first (#1 on top)
       }
-      if (b.score !== a.score) return b.score - a.score;
-      return a.penaltyMinutes - b.penaltyMinutes;
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      return (a.penaltyMinutes || 0) - (b.penaltyMinutes || 0);
     }
 
     // Only team A completed all 5 puzzles
@@ -59,17 +61,22 @@ export const LeaderboardView = ({
       return aLastTime - bLastTime;
     }
 
-    if (b.score !== a.score) return b.score - a.score;
-    return a.penaltyMinutes - b.penaltyMinutes;
+    if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+    return (a.penaltyMinutes || 0) - (b.penaltyMinutes || 0);
   });
 
-  const colleges = ['ALL', ...Array.from(new Set(competingTeams.map((t) => t.college)))];
+  const colleges = ['ALL', ...Array.from(new Set(competingTeams.map((t) => t.college || 'Other').filter(Boolean)))];
 
   const filteredTeams = sortedTeams.filter((t) => {
+    const teamName = (t.name || '').toLowerCase();
+    const college = (t.college || '').toLowerCase();
+    const members = Array.isArray(t.members) ? t.members : [];
+    const query = searchTeam.toLowerCase();
+
     const matchesSearch =
-      t.name.toLowerCase().includes(searchTeam.toLowerCase()) ||
-      t.college.toLowerCase().includes(searchTeam.toLowerCase()) ||
-      t.members.some((m) => m.toLowerCase().includes(searchTeam.toLowerCase()));
+      teamName.includes(query) ||
+      college.includes(query) ||
+      members.some((m) => String(m).toLowerCase().includes(query));
     const matchesCollege = selectedCollege === 'ALL' || t.college === selectedCollege;
     return matchesSearch && matchesCollege;
   });
@@ -192,22 +199,22 @@ export const LeaderboardView = ({
               <h4 className="text-base font-extrabold text-white truncate">{team.name}</h4>
               <p className="text-xs text-zinc-400 truncate mb-4">{team.college}</p>
               <div className="pt-3 border-t border-[#23252a] flex items-center justify-between text-xs font-mono">
-                <span className="text-zinc-400">Puzzles: <strong className="text-[#00e5ff]">{team.solvedPuzzles.length}/{puzzles.length}</strong></span>
-                <span className="text-amber-400 font-bold">{team.score.toLocaleString()} pts</span>
+                <span className="text-zinc-400">Puzzles: <strong className="text-[#00e5ff]">{(team.solvedPuzzles || []).length}/{puzzles.length}</strong></span>
+                <span className="text-amber-400 font-bold">{(team.score || 0).toLocaleString()} pts</span>
               </div>
               <div className="mt-2.5 flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded bg-[#101115] border border-[#232630]">
                 <span className="flex items-center gap-1.5 text-zinc-400 font-bold">
-                  <Dna className={`w-3.5 h-3.5 ${team.solvedPuzzles.length === puzzles.length ? 'text-[#00e5ff]' : 'text-zinc-500'}`} />
-                  <span>{team.solvedPuzzles.length === puzzles.length ? 'COMPLETED:' : 'GENOME-X:'}</span>
+                  <Dna className={`w-3.5 h-3.5 ${(team.solvedPuzzles || []).length === puzzles.length ? 'text-[#00e5ff]' : 'text-zinc-500'}`} />
+                  <span>{(team.solvedPuzzles || []).length === puzzles.length ? 'COMPLETED:' : 'GENOME-X:'}</span>
                 </span>
-                {team.solvedPuzzles.length === puzzles.length ? (
+                {(team.solvedPuzzles || []).length === puzzles.length ? (
                   <span className="text-emerald-300 font-bold flex items-center gap-1 font-mono text-[10px]" title={formatExactDateTime(getTeamCompletionTime(team)).full}>
                     <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
                     <span>{formatExactDateTime(getTeamCompletionTime(team)).full}</span>
                   </span>
                 ) : (
                   <span className="text-zinc-500 flex items-center gap-1">
-                    <Lock className="w-3 h-3" /> {team.solvedPuzzles.length}/{puzzles.length} Solved
+                    <Lock className="w-3 h-3" /> {(team.solvedPuzzles || []).length}/{puzzles.length} Solved
                   </span>
                 )}
               </div>
@@ -310,7 +317,7 @@ export const LeaderboardView = ({
                             )}
                           </div>
                           <div className="text-[11px] text-zinc-500 mt-0.5">
-                            {team.college} &bull; {team.members.join(', ')}
+                            {team.college} &bull; {(team.members || []).join(', ') || 'Unassigned'}
                           </div>
                         </div>
                       </div>
@@ -319,7 +326,7 @@ export const LeaderboardView = ({
                     <td className="py-4 px-3 text-center hidden md:table-cell">
                       <div className="inline-flex items-center gap-1.5">
                         {puzzles.map((p) => {
-                          const solved = team.solvedPuzzles.includes(p.id);
+                          const solved = (team.solvedPuzzles || []).includes(p.id);
                           return (
                             <div
                               key={p.id}
@@ -346,7 +353,7 @@ export const LeaderboardView = ({
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141519] border border-[#23252d] text-zinc-500 text-[10px]">
                           <Lock className="w-3 h-3 text-zinc-600" />
-                          <span>LOCKED ({team.solvedPuzzles.length}/{puzzles.length})</span>
+                          <span>LOCKED ({(team.solvedPuzzles || []).length}/{puzzles.length})</span>
                         </span>
                       )}
                     </td>

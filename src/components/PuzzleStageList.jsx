@@ -17,11 +17,13 @@ export const PuzzleStageList = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showHoloInspector, setShowHoloInspector] = useState(false);
 
-  const solvedIds = activeTeam ? activeTeam.solvedPuzzles : [];
+  const solvedIds = activeTeam?.solvedPuzzles || [];
   const solvedCount = solvedIds.length;
   const nextPuzzleId = solvedCount + 1;
 
-  const filteredPuzzles = puzzles.filter((p) => {
+  const totalStages = puzzles?.length || 5;
+
+  const filteredPuzzles = (puzzles || []).filter((p) => {
     const matchesCat = filterCategory === 'ALL' || p.category === filterCategory;
     const matchesQuery =
       searchQuery === '' ||
@@ -53,10 +55,10 @@ export const PuzzleStageList = ({
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            {puzzles.length} Stage Decryption Matrix
+            {totalStages} Stage Decryption Matrix
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-xl">
-            Each decrypted stage unlocks {Math.round(100 / puzzles.length)}% of the grand FPGA co-processor problem statement. Solve all 5 stages to unlock the full Round One challenge.
+            Each decrypted stage unlocks {Math.round(100 / totalStages)}% of the grand FPGA co-processor problem statement. Solve all {totalStages} stages to unlock the full Round One challenge.
           </p>
         </div>
 

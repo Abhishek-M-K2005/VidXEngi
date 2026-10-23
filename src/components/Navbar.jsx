@@ -27,7 +27,8 @@ export const Navbar = ({
   totalPuzzles
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const percentDecrypted = Math.round((solvedCount / totalPuzzles) * 100);
+  const safeTotal = totalPuzzles > 0 ? totalPuzzles : 5;
+  const percentDecrypted = Math.round(((solvedCount || 0) / safeTotal) * 100);
 
   const NAV_ITEMS = [
     { id: 'puzzles',       label: `${totalPuzzles || 5} Puzzles`,       icon: Cpu },

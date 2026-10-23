@@ -307,7 +307,7 @@ export const PuzzleCard = ({
                         type="text"
                         value={inputAnswer}
                         onChange={(e) => setInputAnswer(e.target.value)}
-                        placeholder="Enter Decryption Key (e.g. signal name, hex token, operator)..."
+                        placeholder="Enter Verilog solution (e.g. assign error_count = ... or expression)..."
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#0a0b0d] border border-[#25272c] text-white placeholder-zinc-600 text-sm font-mono focus:outline-none focus:border-[#00e5ff] transition"
                       />
                     </div>
@@ -343,7 +343,7 @@ export const PuzzleCard = ({
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-[#00e5ff]" />
                       <span className="text-xs font-mono font-bold text-[#00e5ff] uppercase tracking-wider">
-                        DECRYPTED FRAGMENT 0{puzzle.fragment.index}/10: {puzzle.fragment.title}
+                        DECRYPTED FRAGMENT 0{puzzle.fragment.index}/05: {puzzle.fragment.title}
                       </span>
                     </div>
                     <span className="text-[10px] font-mono text-zinc-400 bg-[#0e1013] px-2 py-0.5 rounded border border-[#23272e]">

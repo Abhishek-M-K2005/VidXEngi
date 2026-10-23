@@ -2,369 +2,463 @@ export const PUZZLES = [
   {
     id: 1,
     stageNumber: "01",
-    title: "The Ground Wire Anomaly",
-    category: "LOGIC GATES",
+    title: "Multi-Flag Error Aggregator",
+    category: "COMBINATIONAL LOGIC",
     difficulty: "STANDARD",
     points: 100,
-    storyContext: "At 03:00 hours, NITK's VLSI Cleanroom telemetry reported an illegal voltage spike across Bus Line Alpha. The combinational safety interlock failed because the Karnaugh map minimization was compromised.",
-    puzzleStatement: "Examine the 4-input combinational safety circuit with inputs {A, B, C, D}. The minterm specification where the interlock stays ACTIVE HIGH is Σm(1, 3, 5, 7, 9, 11, 13, 15). Notice any pattern across the 4 variables? What is the single, minimal literal or gate equation that represents this entire function? Provide the single uncomplemented input variable that directly drives output Y.",
+    storyContext: "At 03:00 hours, NITK's Cleanroom telemetry detected asynchronous fault transients across primary Bus Lines Alpha, Beta, and Gamma. To assess fault severity, the supervisory safety interlock requires an instantaneous tally of all active high error flags.",
+    puzzleStatement: "You have three independent 1-bit error flags: err1, err2, and err3. Write the combinational logic to output a 2-bit error_count showing exactly how many flags are high.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Stage 01: Interlock Diagnostic
-module interlock_check (
-    input  wire A, B, C, D,
-    output wire Y
+      code: `// Stage 01: Multi-Flag Error Accumulator
+module error_accumulator (
+    input  wire err1, err2, err3,
+    output wire [1:0] error_count
 );
-    // Minterms: 1, 3, 5, 7, 9, 11, 13, 15
-    // In binary: 0001, 0011, 0101, 0111, 1001, 1011, 1101, 1111
-    // Notice the value of input bit D in all active minterms!
-    assign Y = /* DECODE MINIMAL SINGLE INPUT VARIABLE */;
+    // Write the continuous assignment to count active high flags:
+    assign error_count = /* COMBINATIONAL ADDER LOGIC */;
 endmodule`
     },
-    clue: "Look at the binary representation of every single active minterm. Which bit is ALWAYS 1 regardless of A, B, or C?",
-    hint: "Every single minterm is an odd number (1, 3, 5, 7, 9, 11, 13, 15). In binary, odd numbers always have LSB D=1. So Y simplifies purely to D.",
+    clue: "In Verilog, 1-bit signals can be directly summed using the addition operator `+`. Summing three 1-bit signals produces a result from 0 to 3, perfectly fitting a 2-bit wire.",
+    hint: "Use continuous assignment: assign error_count = err1 + err2 + err3;",
     hintPenaltyMinutes: 5,
-    acceptedAnswers: ["D", "input D", "assign Y = D", "Y=D", "D=1"],
-    explanation: "Because the minterms comprise all 8 states where the least significant bit D is 1 (all odd values from 0 to 15), the 4-variable K-map groups into an entire half-plane octet, simplifying unconditionally to Y = D.",
+    acceptedAnswers: [
+      "assign error_count = err1 + err2 + err3;",
+      "assign error_count = err1 + err2 + err3",
+      "error_count = err1 + err2 + err3;",
+      "error_count = err1 + err2 + err3",
+      "err1 + err2 + err3;",
+      "err1 + err2 + err3",
+      "err1+err2+err3",
+      "assign error_count = {1'b0, err1} + {1'b0, err2} + {1'b0, err3};",
+      "assign error_count = {1'b0, err1} + {1'b0, err2} + {1'b0, err3}",
+      "{1'b0, err1} + {1'b0, err2} + {1'b0, err3}",
+      "assign error_count = (err1 + err2 + err3);",
+      "assign error_count = (err1 + err2 + err3)"
+    ],
+    explanation: "Because err1, err2, and err3 are single-bit wires evaluated in a 2-bit context, the addition operator sums their binary values (0 or 1) to produce a 2-bit binary count between 2'b00 (0) and 2'b11 (3).",
     fragment: {
       index: 1,
-      title: "SYSTEM TOPOLOGY & CORE CLOCK SPECIFICATION",
-      subsystemTag: "SYS_TOP_01",
-      content: "The NEURA-CORE FPGA co-processor operates synchronously at 250 MHz (4.00 ns period, Artix-7 -2 speed grade). The top-level wrapper interface binds a 64-bit wide AXI4-Stream slave RX (rx_axis_tdata, rx_axis_tvalid, rx_axis_tlast) directly to the optical physical MAC PHY layer with maximum propagation skew under 150 picoseconds.",
-      verilogSignature: "input wire clk_250m, rst_n, rx_axis_tvalid, rx_axis_tlast; input wire [63:0] rx_axis_tdata;",
+      title: "MODULE 1: GUIDE MATCHER BLUEPRINT",
+      subsystemTag: "GENOME_M01",
+      content: "Module 1 (<group_id>_guide_matcher) performs 2-bit base-by-base comparisons between an 8-base candidate window (16 bits) and an 8-base guide sequence (16 bits). Encodes A='00', C='01', G='10', T='11'. Counts mismatching bases and asserts match when mismatch_count <= threshold (0-2).",
+      verilogSignature: "module <group_id>_guide_matcher (input wire [15:0] guide, input wire [15:0] window, input wire [1:0] threshold, output wire [3:0] mismatch_count, output wire match);",
       checksum: "0x8F91A0"
     }
   },
   {
     id: 2,
     stageNumber: "02",
-    title: "Clock Jitter on Pin 9: Delta Cycle Hazard",
-    category: "VERILOG RTL",
-    difficulty: "STANDARD",
+    title: "Symbol Pipeline History Shift Register",
+    category: "SEQUENTIAL LOGIC",
+    difficulty: "INTERMEDIATE",
     points: 150,
-    storyContext: "A rookie synthesis engineer implemented a pipelined register bank using blocking '=' assignments inside a clocked procedural block. In simulation, the second register captured the updated value in the very same clock tick!",
-    puzzleStatement: "What is the standard IEEE-1364 Verilog operator that must replace the blocking '=' assignment inside an `always @(posedge clk)` block to prevent delta-cycle race conditions and infer proper sequential D flip-flops?",
+    storyContext: "The genetic sequencer must track continuous streaming sequence fragments arriving over serial lanes. Upstream pattern locators require a continuous side-by-side view of the most recent symbol alongside its preceding symbol.",
+    puzzleStatement: "A 2-bit symbol sym_in arrives every clock cycle. You need to output a 4-bit history bus that always holds the previous symbol and the symbol before that, side-by-side.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Faulty Register Chain causing simulation race condition
-always @(posedge clk) begin
-    q1 = d;    // Race hazard!
-    q2 = q1;   // q2 incorrectly receives 'd' in the same delta cycle
-end
-
-// Fix: What operator belongs here instead of '=' ?`
+      code: `// Stage 02: 2-Stage Symbol Pipeline History Buffer
+module symbol_tracker (
+    input  wire       clk,
+    input  wire [1:0] sym_in,
+    output reg  [3:0] history
+);
+    // Shift incoming 2-bit symbol into the 4-bit history register:
+    always @(posedge clk) begin
+        history <= /* CONCATENATION SHIFT EXPRESSION */;
+    end
+endmodule`
     },
-    clue: "Two characters: less-than symbol followed by equals sign. In hardware terms, it represents non-blocking assignment.",
-    hint: "The operator is '<=' (Non-blocking procedural assignment).",
+    clue: "Use Verilog concatenation `{}` inside a clocked procedural block: shift the current lower 2 bits of history alongside the incoming `sym_in`.",
+    hint: "always @(posedge clk) history <= {history[1:0], sym_in};",
     hintPenaltyMinutes: 5,
-    acceptedAnswers: ["<=", "non-blocking", "non blocking", "<= operator", "non-blocking assignment"],
-    explanation: "In Verilog, '<=' schedules evaluation in the Active region and updates in the Non-Blocking Assignment (NBA) region of the event queue, ensuring registers sample previous-cycle values consistently without simulation race hazards.",
+    acceptedAnswers: [
+      "always @(posedge clk) history <= {history[1:0], sym_in};",
+      "always @(posedge clk) history <= {history[1:0], sym_in}",
+      "always @(posedge clk) begin history <= {history[1:0], sym_in}; end",
+      "always @(posedge clk) history <= {sym_in, history[3:2]};",
+      "always @(posedge clk) history <= {sym_in, history[3:2]}",
+      "history <= {history[1:0], sym_in};",
+      "history <= {history[1:0], sym_in}",
+      "history <= {sym_in, history[3:2]};",
+      "history <= {sym_in, history[3:2]}",
+      "{history[1:0], sym_in}",
+      "{history[1:0],sym_in}",
+      "{sym_in, history[3:2]}",
+      "{sym_in,history[3:2]}"
+    ],
+    explanation: "At every rising clock edge, `{history[1:0], sym_in}` shifts the older symbol into upper bits `[3:2]` and stores the new incoming symbol `sym_in` into lower bits `[1:0]`, providing a continuous 2-symbol temporal history.",
     fragment: {
       index: 2,
-      title: "PACKET DESERIALIZER & ETHERNET FRAME PARSER",
-      subsystemTag: "ETH_PARSER_02",
-      content: "The high-speed ingress pipeline must inspect UDP packet headers in 1 clock cycle. It validates IPv4 multicast addresses, extracts the 16-bit market tick sequence ID, and rejects corrupted checksums with zero payload buffering latency.",
-      verilogSignature: "output wire [15:0] tick_seq_id, output wire tick_valid, output wire crc_pass;",
+      title: "MODULE 2: GENOME WINDOW GENERATOR BLUEPRINT",
+      subsystemTag: "GENOME_M02",
+      content: "Module 2 (<group_id>_genome_window_generator) accepts sequential 8-base incoming fragments (16 bits) synchronized to clk and synchronous active-high rst. Generates consecutive overlapping 8-base windows across fragment boundaries with window_valid handshaking.",
+      verilogSignature: "module <group_id>_genome_window_generator (input wire clk, rst, fragment_valid, input wire [15:0] fragment, output wire [15:0] window, output wire window_valid);",
       checksum: "0x3B41C9"
     }
   },
   {
     id: 3,
     stageNumber: "03",
-    title: "The Metastable Flip-Flop",
-    category: "TIMING & METASTABILITY",
-    difficulty: "INTERMEDIATE",
-    points: 200,
-    storyContext: "An external async push-button pulse arrived precisely during the clock transition window. The first flip-flop output oscillated midway between 0V and 1.8V, threatening downstream combinational logic.",
-    puzzleStatement: "To protect an RTL design against metastability when sampling an asynchronous single-bit signal into a local clock domain, what classic multi-stage hardware topology is universally used as the baseline synchronizer? (Answer with the name of the topology or number of flip-flops in series)",
+    title: "Bus Mask Slicing & Injection",
+    category: "BIT SLICING & CONCATENATION",
+    difficulty: "STANDARD",
+    points: 150,
+    storyContext: "During DNA sequence reconstruction, the diagnostic test unit must force an emergency override mask into a sequence header. The middle 4 nibble bits must be clamped to all-ones (0xF) while preserving the high-order and low-order status bits unmodified.",
+    puzzleStatement: "You have an 8-bit bus data_in. Write a continuous assignment that outputs data_out where the middle 4 bits (bits 5 down to 2) are replaced with 4'b1111, but the outer bits are left untouched.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Async Boundary Synchronizer
-module sync_pulse (
-    input  wire clk,
-    input  wire async_in,
-    output wire sync_out
+      code: `// Stage 03: Middle-Bit Mask Injection Engine
+module mask_replace (
+    input  wire [7:0] data_in,
+    output wire [7:0] data_out
 );
-    reg stage1, stage2;
-    always @(posedge clk) begin
-        stage1 <= async_in;
-        stage2 <= stage1;  // Resolves metastable state to valid rail
-    end
-    assign sync_out = stage2;
+    // Replace bits [5:2] with 4'b1111, preserving bits [7:6] and [1:0]:
+    assign data_out = /* CONCATENATION REPLACEMENT */;
 endmodule`
     },
-    clue: "Often abbreviated as '2-FF' or named the 'two flip-flop synchronizer' or 'dual flip flop'.",
-    hint: "Enter '2-FF' or 'Two Flip-Flop Synchronizer' or 'Dual Flip Flop'.",
-    hintPenaltyMinutes: 8,
-    acceptedAnswers: ["2-ff", "2-ff synchronizer", "two flip-flop", "two flip flop", "dual flip flop", "2 flip flop", "double flop", "2ff"],
-    explanation: "The two flip-flop (2-FF) synchronizer gives the first metastable flip-flop one full clock cycle to settle exponentially towards a stable logic rail before the second flip-flop samples it, dramatically increasing the MTBF (Mean Time Between Failures).",
+    clue: "Split `data_in` using bus slicing: take upper bits `data_in[7:6]`, concatenate literal `4'b1111`, and concatenate lower bits `data_in[1:0]` inside `{}`.",
+    hint: "assign data_out = {data_in[7:6], 4'b1111, data_in[1:0]};",
+    hintPenaltyMinutes: 5,
+    acceptedAnswers: [
+      "assign data_out = {data_in[7:6], 4'b1111, data_in[1:0]};",
+      "assign data_out = {data_in[7:6], 4'b1111, data_in[1:0]}",
+      "assign data_out = {data_in[7:6], 4'hf, data_in[1:0]};",
+      "assign data_out = {data_in[7:6], 4'hf, data_in[1:0]}",
+      "data_out = {data_in[7:6], 4'b1111, data_in[1:0]};",
+      "data_out = {data_in[7:6], 4'b1111, data_in[1:0]}",
+      "{data_in[7:6], 4'b1111, data_in[1:0]};",
+      "{data_in[7:6], 4'b1111, data_in[1:0]}",
+      "{data_in[7:6],4'b1111,data_in[1:0]}",
+      "{data_in[7:6], 4'hf, data_in[1:0]}",
+      "{data_in[7:6],4'hf,data_in[1:0]}"
+    ],
+    explanation: "Verilog concatenation `{data_in[7:6], 4'b1111, data_in[1:0]}` reassembles the 8-bit bus by preserving the 2 most-significant bits [7:6], inserting the 4-bit literal 1111 into positions [5:2], and preserving the 2 least-significant bits [1:0].",
     fragment: {
       index: 3,
-      title: "CLOCK DOMAIN CROSSING (CDC) FIFO SPECIFICATION",
-      subsystemTag: "CDC_QUEUE_03",
-      content: "Ingress packet data crosses from the PHY 156.25 MHz clock to the 250 MHz computational engine via a dual-clock asynchronous FIFO. Read and write pointers must be synchronized across domains exclusively via Gray code encoding to prevent multi-bit transit glitches.",
-      verilogSignature: "wire [8:0] wr_ptr_gray, rd_ptr_gray; parameter FIFO_DEPTH = 512;",
-      checksum: "0x9E7022"
+      title: "MODULE 3: TARGET LOCATOR BLUEPRINT",
+      subsystemTag: "GENOME_M03",
+      content: "Module 3 (<group_id>_target_locator) searches a 32-base genome (64 bits, packed base 0 at [63:62]) from base index 0 through 24 for the first eligible target matching the guide sequence within the mismatch threshold (0-2). Reports leftmost target_position, mismatch_count, target_found, and done.",
+      verilogSignature: "module <group_id>_target_locator (input wire clk, rst, start, input wire [63:0] genome, input wire [15:0] guide, input wire [1:0] threshold, output wire target_found, output wire [4:0] target_position, output wire [3:0] mismatch_count, output wire done);",
+      checksum: "0xA790EE"
     }
   },
   {
     id: 4,
     stageNumber: "04",
-    title: "FSM State Lockout & Encoding",
-    category: "FSM ARCHITECTURE",
+    title: "Multi-Driver Conflict Resolution",
+    category: "RTL RACE CONDITIONS",
     difficulty: "INTERMEDIATE",
-    points: 250,
-    storyContext: "The transaction controller FSM crashed because an alpha particle caused a bit-flip, dropping the state machine into an unmapped state. The synthesizer had stripped the recovery logic.",
-    puzzleStatement: "In high-speed FPGA designs, what state encoding style uses exactly one dedicated register per state bit (having Hamming distance = 2 between legal states, avoiding wide decoding muxes and delivering the highest f_max)?",
+    points: 200,
+    storyContext: "A junior RTL engineer attempted to implement an execution trigger flag for the editing stage using two concurrent `always` blocks. During EDA synthesis, the compiler aborted with a critical 'multi-driven net' fatal error because both procedural blocks assign to the same register.",
+    puzzleStatement: `A student wants a flag to turn ON when start is high, and OFF when stop is high.
+Correct the student's code to make it work:
+always @(posedge clk) if (start) flag <= 1;
+always @(posedge clk) if (stop)  flag <= 0;`,
     hardwareSnippet: {
       language: "verilog",
-      code: `// State Encoding Dilemma
-localparam STATE_IDLE   = 4'b0001;
-localparam STATE_HEADER = 4'b0010;
-localparam STATE_PAYLOAD= 4'b0100;
-localparam STATE_COMMIT = 4'b1000;
-// Exactly one bit is active '1' for each state!`
+      code: `// Stage 04: Multiple-Driver Elimination
+// BUGGY SYNTHESIS ATTEMPT:
+//   always @(posedge clk) if (start) flag <= 1;
+//   always @(posedge clk) if (stop)  flag <= 0; // Fatal: multi-driven register!
+
+// Provide the single unified always block with proper priority logic:
+always @(posedge clk) begin
+    /* UNIFIED CONDITIONAL PRIORITY LOGIC */
+end`
     },
-    clue: "Opposite of binary encoding. Known as 'one-___' encoding.",
-    hint: "The encoding is named 'one-hot'.",
+    clue: "In hardware, a register can only be assigned within a SINGLE procedural `always` block. Unify the two conditions into one block using `if ... else if ...`.",
+    hint: "always @(posedge clk) if (stop) flag <= 0; else if (start) flag <= 1;",
     hintPenaltyMinutes: 8,
-    acceptedAnswers: ["one-hot", "one hot", "onehot", "one-hot encoding"],
-    explanation: "One-hot encoding assigns each state its own flip-flop bit. In FPGAs rich in registers and 6-LUTs, one-hot yields minimal combinational next-state decoding depth, maximizing timing slack at 250+ MHz.",
+    acceptedAnswers: [
+      "always @(posedge clk) if (stop) flag <= 0; else if (start) flag <= 1;",
+      "always @(posedge clk) if (stop) flag <= 0; else if (start) flag <= 1",
+      "always @(posedge clk) if (start) flag <= 1; else if (stop) flag <= 0;",
+      "always @(posedge clk) if (start) flag <= 1; else if (stop) flag <= 0",
+      "if (stop) flag <= 0; else if (start) flag <= 1;",
+      "if (stop) flag <= 0; else if (start) flag <= 1",
+      "if (start) flag <= 1; else if (stop) flag <= 0;",
+      "if (start) flag <= 1; else if (stop) flag <= 0",
+      "always @(posedge clk) begin if (stop) flag <= 0; else if (start) flag <= 1; end",
+      "always @(posedge clk) begin if (start) flag <= 1; else if (stop) flag <= 0; end",
+      "always @(posedge clk) if (stop) flag <= 1'b0; else if (start) flag <= 1'b1;",
+      "always @(posedge clk) if (start) flag <= 1'b1; else if (stop) flag <= 1'b0;",
+      "if (stop) flag <= 1'b0; else if (start) flag <= 1'b1;",
+      "if (start) flag <= 1'b1; else if (stop) flag <= 1'b0;",
+      "single always block"
+    ],
+    explanation: "Multiple `always` blocks driving the same register violate synthesis rules because they create conflicting physical drivers on the flip-flop D-input. Merging both conditions into a single clocked block with priority (`if (stop) ... else if (start) ...`) creates a deterministic, valid hardware circuit.",
     fragment: {
       index: 4,
-      title: "ORDER-BOOK L3 DEPTH ENGINE",
-      subsystemTag: "BOOK_L3_04",
-      content: "Maintains top-16 bid and ask limit price levels in high-speed parallel distributed registers. Upon arrival of tick delta, the engine completes priority-insert or cancel operations within 2 clock cycles using parallel comparator trees.",
-      verilogSignature: "output wire [31:0] best_bid_price, best_ask_price; output wire [15:0] spread_ticks;",
-      checksum: "0x12FA88"
+      title: "MODULE 4: GENOME EDITOR BLUEPRINT",
+      subsystemTag: "GENOME_M04",
+      content: "Module 4 (<group_id>_genome_editor) performs controlled 4-base substitution (8 bits) into a 32-base genome (64 bits) starting at edit_position (valid from 0 through 28). Preserves all untouched bases, rejects out-of-range positions without corruption, and asserts edit_success & done.",
+      verilogSignature: "module <group_id>_genome_editor (input wire clk, rst, edit_request, input wire [63:0] genome_in, input wire [4:0] edit_position, input wire [7:0] replacement, output wire [63:0] genome_out, output wire edit_success, output wire done);",
+      checksum: "0x1994EF"
     }
   },
   {
     id: 5,
     stageNumber: "05",
-    title: "The Ghost in the LFSR",
-    category: "LOGIC GATES",
+    title: "1-Cycle Latency Verification Monitor",
+    category: "TIMING & ASSERTION",
     difficulty: "INTERMEDIATE",
-    points: 300,
-    storyContext: "The random testbench generator flatlined into an all-zeros output stream and never recovered. The linear feedback shift register tapped polynomial was mathematically correct, but an illegal seed locked it in an unrecoverable null cycle.",
-    puzzleStatement: "Consider a 4-bit Fibonacci LFSR with feedback polynomial P(x) = x^4 + x^3 + 1 (XOR taps on bit 3 and bit 2). If initialized with seed 4'b0000, what will the register contain on the subsequent clock tick? Provide the 4-bit binary value (e.g., 0000).",
+    points: 200,
+    storyContext: "The independent genome verification engine must monitor sequence transformations. The automated telemetry monitor must verify pipeline contracts and raise a hardware assertion flag whenever an unexpected delay or corruption occurs.",
+    puzzleStatement: "A module takes data_in and spits out data_out exactly one clock cycle later. Assert an error flag if data_out does not match the original data_in.",
     hardwareSnippet: {
       language: "verilog",
-      code: `module lfsr_4bit (
-    input  wire clk, rst,
-    output reg [3:0] q
+      code: `// Stage 05: 1-Cycle Pipeline Verification Monitor
+module latency_checker (
+    input  wire clk,
+    input  wire [7:0] data_in,
+    input  wire [7:0] data_out,
+    output wire error
 );
-    wire feedback = q[3] ^ q[2];
-    always @(posedge clk) begin
-        if (rst) q <= 4'b0000; // The fatal seed!
-        else     q <= {q[2:0], feedback};
-    end
+    reg [7:0] dly_reg;
+
+    // Register data_in by one clock cycle, then assert error if mismatch:
+    always @(posedge clk) dly_reg <= data_in;
+    assign error = /* INEQUALITY COMPARISON */;
 endmodule`
     },
-    clue: "0 XOR 0 = 0. Shifting zeros creates... zeros.",
-    hint: "Because 0 ^ 0 = 0, shifting produces 4'b0000 forever. The all-zero state is the forbidden lockup trap in XOR LFSRs.",
-    hintPenaltyMinutes: 10,
-    acceptedAnswers: ["0000", "4'b0000", "0", "4'd0", "4'h0"],
-    explanation: "An XOR-based LFSR has an all-zero lockup state because 0^0 evaluates to 0 perpetually. Hardware LFSRs must be initialized with a non-zero seed or use an XNOR gate to enable self-start from zero.",
+    clue: "Store `data_in` on `posedge clk` in an intermediate register (`dly_reg <= data_in;`), and continuously assert `error` when `data_out` is not equal to `dly_reg` (`data_out != dly_reg`).",
+    hint: "always @(posedge clk) dly_reg <= data_in;\nassign error = (data_out != dly_reg);",
+    hintPenaltyMinutes: 8,
+    acceptedAnswers: [
+      "always @(posedge clk) dly_reg <= data_in; assign error = (data_out != dly_reg);",
+      "always @(posedge clk) dly_reg <= data_in; assign error = (data_out != dly_reg)",
+      "always @(posedge clk) dly_reg <= data_in; assign error = data_out != dly_reg;",
+      "always @(posedge clk) dly_reg <= data_in; assign error = data_out != dly_reg",
+      "always @(posedge clk) begin dly_reg <= data_in; end assign error = (data_out != dly_reg);",
+      "always @(posedge clk) dly_reg <= data_in; assign error = (data_in_d != data_out);",
+      "always @(posedge clk) data_dly <= data_in; assign error = (data_out != data_dly);",
+      "assign error = (data_out != dly_reg);",
+      "assign error = (data_out != dly_reg)",
+      "assign error = data_out != dly_reg;",
+      "assign error = data_out != dly_reg",
+      "error = (data_out != dly_reg);",
+      "error = (data_out != dly_reg)",
+      "(data_out != dly_reg)",
+      "data_out != dly_reg",
+      "dly_reg <= data_in; assign error = (data_out != dly_reg);",
+      "dly_reg <= data_in; assign error = (data_out != dly_reg)"
+    ],
+    explanation: "Because `data_out` represents the module's output 1 cycle later, sampling `data_in` into `dly_reg` at `posedge clk` aligns both signals in the same clock cycle. Comparing `(data_out != dly_reg)` asserts `error` whenever the pipeline output deviates from the delayed input.",
     fragment: {
       index: 5,
-      title: "Q16.16 FIXED-POINT ARBITRAGE ARITHMETIC UNIT",
-      subsystemTag: "DSP_ALU_05",
-      content: "The mathematical decision kernel computes triangular cross-currency arbitrage differentials: Δ = (Bid_A * Bid_B) - Ask_C using DSP48E1 primitives. All calculations are executed in signed Q16.16 fixed-point format with saturation clipping.",
-      verilogSignature: "input wire signed [31:0] price_a, price_b, price_c; output wire signed [31:0] arb_profit;",
-      checksum: "0x5C800E"
-    }
-  },
-  {
-    id: 6,
-    stageNumber: "06",
-    title: "ALU Overflow Bit Paradox",
-    category: "VERILOG RTL",
-    difficulty: "ADVANCED",
-    points: 350,
-    storyContext: "During a stress test, an 8-bit signed accumulator computed 127 + 1. Instead of 128, the register wrapped around to -128, triggering a catastrophic margin liquidation simulation error.",
-    puzzleStatement: "In two's complement binary arithmetic, signed overflow occurs when the carry into the sign bit differs from the carry out of the sign bit. What single 2-input logic gate computes this overflow condition V from Carry_In and Carry_Out (i.e. V = C_in ? C_out)?",
-    hardwareSnippet: {
-      language: "verilog",
-      code: `// 8-bit Signed Adder Overflow Detector
-wire c_into_msb;  // Carry into bit 7
-wire c_out_msb;   // Carry out of bit 7
-wire overflow;    // Active high when signed arithmetic overflows
-
-// What logic gate produces 'overflow' from these two carry bits?
-assign overflow = c_into_msb ^ c_out_msb;`
-    },
-    clue: "The gate outputs 1 when the inputs differ, and 0 when they are identical.",
-    hint: "Exclusive OR gate (XOR).",
-    hintPenaltyMinutes: 10,
-    acceptedAnswers: ["xor", "exclusive or", "exclusive-or", "^", "xor gate"],
-    explanation: "Signed two's complement overflow happens if and only if Carry-in to MSB ≠ Carry-out from MSB. The XOR (Exclusive-OR) gate is the fundamental hardware detector for this exact inequality.",
-    fragment: {
-      index: 6,
-      title: "MICROCODE EXECUTION SEQUENCER & TRIGGER DISPATCH",
-      subsystemTag: "EXEC_SEQ_06",
-      content: "If the calculated arbitrage spread exceeds the dynamic gas/exchange fee threshold (arb_profit > fee_thresh_q16), the execution engine constructs an outbound order execution token in under 8.0 nanoseconds (2 clock cycles).",
-      verilogSignature: "output wire order_fire, output wire [63:0] order_token, output wire [15:0] qty_lots;",
-      checksum: "0xD432A1"
-    }
-  },
-  {
-    id: 7,
-    stageNumber: "07",
-    title: "Memory Collision in True Dual-Port Block RAM",
-    category: "FPGA HARDWARE",
-    difficulty: "ADVANCED",
-    points: 400,
-    storyContext: "Port A and Port B of an FPGA BRAM attempted to access the exact same address 0x3FF simultaneously. Port A was writing while Port B was reading.",
-    puzzleStatement: "When a read and write occur at the identical address on the same clock cycle in Xilinx True Dual-Port Block RAM, what memory configuration mode ensures that the read port immediately outputs the freshly written data? (Choose: WRITE_FIRST, READ_FIRST, or NO_CHANGE)",
-    hardwareSnippet: {
-      language: "verilog",
-      code: `// BRAM Collision Mode Definition
-// Mode options:
-// 1. "WRITE_FIRST" (Transparent mode: output reflects new input data)
-// 2. "READ_FIRST"  (Output reflects old stored data before write)
-// 3. "NO_CHANGE"   (Output remains latched during write)
-
-(* ram_style = "block" *)
-reg [63:0] ram [0:1023];
-// Desired mode for instant transparency:`
-    },
-    clue: "Write occurs before read: WRITE_...",
-    hint: "Enter 'WRITE_FIRST'.",
-    hintPenaltyMinutes: 10,
-    acceptedAnswers: ["write_first", "write first", "write-first", "\"write_first\""],
-    explanation: "In Xilinx 7-series and UltraScale Block RAMs, the WRITE_FIRST (also known as transparent mode) attribute guarantees that when a collision occurs, Port B observes the incoming write data from Port A during the same clock cycle.",
-    fragment: {
-      index: 7,
-      title: "CIRCULAR RING BUFFER & SLIPPAGE AUDIT LOG",
-      subsystemTag: "RING_BUF_07",
-      content: "A 4096-entry 128-bit wide Block RAM configured in WRITE_FIRST mode logs all timestamped tick-to-trade latencies, rejected quotes, and fill confirmations. Backpressure flow control alerts the host via PCIe interrupt if depth hits 90%.",
-      verilogSignature: "output wire [11:0] buffer_occupancy, output wire fifo_near_full, output wire pcie_irq;",
-      checksum: "0x77E1B5"
-    }
-  },
-  {
-    id: 8,
-    stageNumber: "08",
-    title: "Asynchronous FIFO Gray Code Conversion",
-    category: "TIMING & METASTABILITY",
-    difficulty: "ADVANCED",
-    points: 450,
-    storyContext: "In an asynchronous FIFO, passing standard binary pointers across clock domains causes catastrophic read/write pointer corruption when multiple bits flip simultaneously (e.g. from 0111 to 1000). Gray code guarantees only 1 bit changes at any transition.",
-    puzzleStatement: "Given a 4-bit binary value B = 4'b1010, what is its corresponding 4-bit Gray code value G? (Formula: G = B ^ (B >> 1). Calculate the 4 bits: b3, b3^b2, b2^b1, b1^b0). Provide the 4-bit binary output.",
-    hardwareSnippet: {
-      language: "verilog",
-      code: `// Binary to Gray Code Converter
-function [3:0] bin2gray(input [3:0] bin);
-    bin2gray = bin ^ (bin >> 1);
-endfunction
-
-// Input:  4'b1010
-// Shift:  4'b0101
-// XOR:    1010 ^ 0101 = ?`
-    },
-    clue: "Bit 3 is 1^0 = 1. Bit 2 is 0^1 = 1. Bit 1 is 1^0 = 1. Bit 0 is 0^1 = 1.",
-    hint: "1010 XOR 0101 yields 1111.",
-    hintPenaltyMinutes: 12,
-    acceptedAnswers: ["1111", "4'b1111", "15", "4'hF", "0xF"],
-    explanation: "Computing bitwise: MSB remains 1. Next bit: 1^0 = 1. Third bit: 0^1 = 1. LSB: 1^0 = 1. The resulting Gray code for 1010 (binary 10) is 1111.",
-    fragment: {
-      index: 8,
-      title: "HARDWARE CRC32 INTEGRITY ENGINE",
-      subsystemTag: "CRC32_ENG_08",
-      content: "Computes IEEE 802.3 32-bit Ethernet Cyclic Redundancy Check across 64-bit parallel data words in 1 cycle. Employs optimized Galois XOR matrix generator reducing logic depth to 4 levels of 6-LUTs.",
-      verilogSignature: "input wire [63:0] data_in; output wire [31:0] crc32_out; input wire crc_init, crc_en;",
-      checksum: "0x20F9C7"
-    }
-  },
-  {
-    id: 9,
-    stageNumber: "09",
-    title: "UART Baud Rate Divisor at 50 MHz",
-    category: "FPGA HARDWARE",
-    difficulty: "ELITE",
-    points: 500,
-    storyContext: "The diagnostic FPGA UART console spews garbage characters during boot because the integer divider register was calculated incorrectly for the on-board 50 MHz system oscillator.",
-    puzzleStatement: "You have a 50,000,000 Hz (50 MHz) FPGA system clock. You need to generate an oversampled 16x baud tick for a target baud rate of 115,200 bps. The divisor equation is: Divisor = Clock_Frequency / (16 * Baud_Rate). Round the result to the nearest integer. What is this integer divisor value?",
-    hardwareSnippet: {
-      language: "verilog",
-      code: `// UART Baud Rate Generator Parameter
-parameter CLK_HZ    = 50_000_000;
-parameter BAUD_RATE = 115_200;
-parameter OVERSAMPLE= 16;
-
-// Divisor = 50,000,000 / (16 * 115,200)
-// Divisor = 50,000,000 / 1,843,200 = 27.1267...
-// Nearest Integer: ?`
-    },
-    clue: "50,000,000 divided by 1,843,200 is approximately 27.126. Nearest whole number?",
-    hint: "27",
-    hintPenaltyMinutes: 12,
-    acceptedAnswers: ["27", "27.13", "0x1B", "8'd27"],
-    explanation: "50,000,000 / (16 * 115,200) = 27.1267. Using an integer counter that resets every 27 clock ticks yields an actual baud rate of 115,740 bps, giving an error of just 0.47%, well within the standard 2% UART tolerance limit.",
-    fragment: {
-      index: 9,
-      title: "THERMAL GOVERNOR & DYNAMIC CLOCK SHUTDOWN",
-      subsystemTag: "THRM_GOV_09",
-      content: "Reads the internal 7-Series XADC temperature sensor at 1 kHz. If junction temperature exceeds 85°C, the governor de-asserts clock gate CE to idle the compute core, preventing thermal runaway while maintaining register state.",
-      verilogSignature: "input wire [11:0] xadc_temp_raw; output wire thermal_alarm, core_clk_enable;",
-      checksum: "0x6A19FF"
-    }
-  },
-  {
-    id: 10,
-    stageNumber: "10",
-    title: "The FPGA Bitstream Sync Word",
-    category: "FPGA HARDWARE",
-    difficulty: "ELITE",
-    points: 600,
-    storyContext: "The JTAG boundary scan programmer is attempting to initialize configuration SRAM on the Artix-7 chip. The hardware configuration controller is scanning incoming serial SPI flash bytes for the universal 32-bit Synchronization Word to align byte boundaries.",
-    puzzleStatement: "What is the universal 32-bit hexadecimal Synchronization Word embedded in all Xilinx FPGA bitstreams (Artix-7, Kintex-7, Virtex-7, UltraScale) that tells the configuration state machine to start decoding frame packets? (Format: 8 hex characters, e.g. AA995566 or 0xAA995566)",
-    hardwareSnippet: {
-      language: "verilog",
-      code: `// FPGA Configuration State Machine (UG470)
-// 1. Bus Width Auto-Detect: 0x000000BB, 0x11220044
-// 2. Dummy Word:            0xFFFFFFFF
-// 3. SYNCHRONIZATION WORD:  32'h???????? (0xAA99....)
-// Once matched, CFG_STATE transitions to PACKET_PARSE!`
-    },
-    clue: "It alternates hex digits: AA, 99, 55, 66. Written without spaces: AA995566.",
-    hint: "The sync word is AA995566 (or 0xAA995566).",
-    hintPenaltyMinutes: 15,
-    acceptedAnswers: ["aa995566", "0xaa995566", "32'haa995566", "0xAA995566", "AA995566"],
-    explanation: "Per the Xilinx 7 Series FPGAs Configuration User Guide (UG470), the 32-bit Synchronization Word is 0xAA995566. Finding this exact sequence aligns the internal configuration logic to packet boundaries before reading bitstream commands.",
-    fragment: {
-      index: 10,
-      title: "FINAL ARBITRATION PROTOCOL & GOLDEN BITSTREAM RUBRIC",
-      subsystemTag: "FINAL_SYNTH_10",
-      content: "All 10 subsystems now synthesize into the unified top module 'neura_core_top.v'. Submissions must meet: F_MAX >= 250 MHz on xc7a100tcsg324-2, Total Logic Utilization < 65% LUTs, Zero Setup/Hold timing violations, and pass the 10,000 tick golden market simulation testbench.",
-      verilogSignature: "module neura_core_top ( ... full top-level netlist available for download ... );",
-      checksum: "0x4EEB90"
+      title: "MODULE 5: EDIT VERIFIER BLUEPRINT",
+      subsystemTag: "GENOME_M05",
+      content: "Module 5 (<group_id>_edit_verifier) independently reconstructs the expected edited genome from genome_original, edit_position, and replacement. Compares against actual genome_edited across all 32 bases, outputting 6-bit mismatch_count, verify_pass (only on exact 32-base match), and done.",
+      verilogSignature: "module <group_id>_edit_verifier (input wire clk, rst, verify_request, input wire [63:0] genome_original, genome_edited, input wire [4:0] edit_position, input wire [7:0] replacement, output wire verify_pass, output wire [5:0] mismatch_count, output wire done);",
+      checksum: "0xFE5591"
     }
   }
 ];
 
 export const FINAL_PROBLEM_STATEMENT = {
-  title: "PROJECT NEURA-CORE: ZERO-LATENCY ARBITRAGE CO-PROCESSOR",
-  subtitle: "ACM Vidyut x Engineer '26 NITK Hardware Hackathon Grand Challenge",
+  title: "GENOME-X: SYNTHETIC GENOME EDITING & VERIFICATION ENGINE",
+  subtitle: "Verilog Quest 2026 | Round 1: Module Design and Verification",
   sponsor: "Sponsored by Arcesium",
-  targetHardware: "Xilinx Artix-7 FPGA (xc7a100tcsg324-2)",
-  clockConstraint: "250.00 MHz (4.00 ns period, WNS >= 0.250 ns)",
+  targetHardware: "FPGA Synthesizable Digital Hardware (Xilinx Artix-7 compatible)",
+  clockConstraint: "Synchronous Rising-Edge Clock & Synchronous Active-High Reset",
   prizePool: "₹17,500 INR",
-  overview: "Modern algorithmic trading institutions rely on ultra-low-latency FPGA hardware to detect and execute multi-currency triangular arbitrage opportunities in under 50 nanoseconds. Your team's mission in this grand challenge is to implement and synthesize 'neura_core_top', a real-time hardware co-processor capable of processing 64-bit Ethernet AXI-Stream ticks, updating an internal 16-level L3 order book, computing fixed-point arbitrage spreads, and dispatching signed order execution tokens with deterministic zero packet drops.",
-  designRequirements: [
-    "Clock Frequency: Synchronous operation at 250 MHz on Artix-7 (-2 speed grade). All primary datapath registers must exhibit strictly positive Worst Negative Slack (WNS > 0.00 ns).",
-    "AXI4-Stream Ingress: Ingest 64-bit wide network ticks via rx_axis_tdata, parse IP/UDP multicast frame headers in 1 clock cycle.",
-    "Order Book L3 Engine: Maintain Top-16 bid and ask limit prices with priority-insert and tick cancellation in <= 2 clock cycles.",
-    "Q16.16 DSP Arithmetic: Compute cross-rate triangular arbitrage formula: Δ = (Bid_A * Bid_B) - Ask_C utilizing dedicated DSP48E1 primitives.",
-    "Asynchronous CDC: Safe dual-clock asynchronous boundary crossing using Gray-coded pointers with 2-FF MTBF protection.",
-    "Outbound Execution Token: Emit a 64-bit fire token within 2 clock cycles of opportunity trigger.",
-    "Hardware Integrity: Validate frame payload with parallel 64-bit CRC32 engine matching IEEE 802.3 standard."
+  year: "2089",
+  overview: "A critical system responsible for processing synthetic genetic sequences has suffered a failure. Its sequence-search, editing, and verification subsystems must be rebuilt before the system can be brought back online. Your mission is to design GENOME-X, a digital hardware system that searches a synthetic DNA sequence, identifies a target region, performs a controlled edit, and independently verifies the result using synthesizable Verilog.",
+  disclaimer: "This is a digital hardware simulation using synthetic sequence data. It does not perform actual biological gene editing.",
+  
+  dnaRepresentation: {
+    encoding: [
+      { base: "A", bits: "00", binary: "2'b00" },
+      { base: "C", bits: "01", binary: "2'b01" },
+      { base: "G", bits: "10", binary: "2'b10" },
+      { base: "T", bits: "11", binary: "2'b11" }
+    ],
+    parameters: [
+      { parameter: "Genome", size: "32 bases", bits: "64 bits", description: "Packed base 0 at [63:62], base 1 at [61:60], down to base 31 at [1:0]" },
+      { parameter: "Guide sequence", size: "8 bases", bits: "16 bits", description: "Target sequence to locate within the genome" },
+      { parameter: "Replacement sequence", size: "4 bases", bits: "8 bits", description: "Controlled sequence to substitute into the target region" },
+      { parameter: "Mismatch threshold", size: "Configurable", bits: "2 bits", description: "Permitted differing bases (0, 1, or 2)" }
+    ],
+    packingRule: "The genome is packed such that base 0 occupies bits [63:62], base 1 occupies [61:60], base 2 occupies [59:58], and so on, with base 31 at [1:0]."
+  },
+
+  namingConvention: {
+    rule: "<group_id>_<module_name>",
+    exampleGroupId: "T07",
+    examples: [
+      "T07_guide_matcher",
+      "T07_genome_window_generator",
+      "T07_target_locator",
+      "T07_genome_editor",
+      "T07_edit_verifier"
+    ],
+    guidelines: [
+      "Use a short, unique group identifier assigned or approved by the organizers (e.g., T01, T07).",
+      "Use lowercase letters, numbers, and underscores only.",
+      "Preserve the required module-name suffix exactly.",
+      "Ensure all declarations, instantiations, and testbenches use the same prefix.",
+      "Do not modify the specified input/output names or bit widths."
+    ]
+  },
+
+  modules: [
+    {
+      id: "M01",
+      name: "guide_matcher",
+      fullName: "<group_id>_guide_matcher",
+      title: "Module 1: Guide Matcher",
+      points: 15,
+      objective: "Determine whether an 8-base candidate window matches a given guide sequence.",
+      signals: [
+        { name: "guide", dir: "Input", width: "16 bits", desc: "8-base guide sequence" },
+        { name: "window", dir: "Input", width: "16 bits", desc: "Candidate 8-base window" },
+        { name: "threshold", dir: "Input", width: "2 bits", desc: "Maximum permitted mismatches, 0–2" },
+        { name: "mismatch_count", dir: "Output", width: "4 bits", desc: "Number of differing bases (0 to 8)" },
+        { name: "match", dir: "Output", width: "1 bit", desc: "Asserted when mismatch_count <= threshold" }
+      ],
+      functionalRequirements: [
+        "Compare corresponding DNA bases, not individual bits.",
+        "Count the number of positions where the 2-bit bases differ.",
+        "Assert 'match' when 'mismatch_count' is less than or equal to 'threshold'.",
+        "Handle threshold values of 0, 1, and 2 correctly."
+      ]
+    },
+    {
+      id: "M02",
+      name: "genome_window_generator",
+      fullName: "<group_id>_genome_window_generator",
+      title: "Module 2: Genome Window Generator",
+      points: 20,
+      objective: "Generate overlapping 8-base windows from consecutive incoming input fragments (each fragment contains 8 bases = 16 bits).",
+      signals: [
+        { name: "clk", dir: "Input", width: "1 bit", desc: "System clock" },
+        { name: "rst", dir: "Input", width: "1 bit", desc: "Synchronous active-high reset" },
+        { name: "fragment", dir: "Input", width: "16 bits", desc: "Incoming 8-base fragment" },
+        { name: "fragment_valid", dir: "Input", width: "1 bit", desc: "Indicates a valid incoming fragment" },
+        { name: "window", dir: "Output", width: "16 bits", desc: "Generated 8-base candidate window" },
+        { name: "window_valid", dir: "Output", width: "1 bit", desc: "Indicates a valid output window" }
+      ],
+      functionalRequirements: [
+        "Accept fragments in sequence.",
+        "Generate consecutive, overlapping 8-base windows across fragment boundaries.",
+        "Preserve the order of bases.",
+        "Avoid losing or duplicating windows.",
+        "Define and implement when the first output window becomes valid.",
+        "Document clearly the behavior and timing of the window generator in design explanations."
+      ]
+    },
+    {
+      id: "M03",
+      name: "target_locator",
+      fullName: "<group_id>_target_locator",
+      title: "Module 3: Target Locator",
+      points: 20,
+      objective: "Search a 32-base genome and identify the first eligible target matching the guide sequence.",
+      signals: [
+        { name: "clk", dir: "Input", width: "1 bit", desc: "System clock" },
+        { name: "rst", dir: "Input", width: "1 bit", desc: "Synchronous active-high reset" },
+        { name: "start", dir: "Input", width: "1 bit", desc: "Starts a search operation" },
+        { name: "genome", dir: "Input", width: "64 bits", desc: "Original 32-base genome" },
+        { name: "guide", dir: "Input", width: "16 bits", desc: "8-base guide sequence" },
+        { name: "threshold", dir: "Input", width: "2 bits", desc: "Maximum permitted mismatches (0–2)" },
+        { name: "target_found", dir: "Output", width: "1 bit", desc: "Indicates an eligible target was found" },
+        { name: "target_position", dir: "Output", width: "5 bits", desc: "Starting base index of the selected target (0–24)" },
+        { name: "mismatch_count", dir: "Output", width: "4 bits", desc: "Mismatch count at the selected target" },
+        { name: "done", dir: "Output", width: "1 bit", desc: "Indicates that search has completed" }
+      ],
+      functionalRequirements: [
+        "Search the genome from base position 0 through base position 24.",
+        "Examine all valid 8-base windows, including overlapping windows.",
+        "Use the configured mismatch threshold.",
+        "Report the leftmost eligible target, its starting position, and its mismatch count.",
+        "Correctly indicate when no eligible target exists (target_found = 0).",
+        "Assert 'done' when the search has finished.",
+        "Use the functionality of both Guide Matcher and Genome Window Generator (document interface and connection method)."
+      ]
+    },
+    {
+      id: "M04",
+      name: "genome_editor",
+      fullName: "<group_id>_genome_editor",
+      title: "Module 4: Genome Editor",
+      points: 20,
+      objective: "Perform a controlled substitution of four consecutive bases at a specified position.",
+      signals: [
+        { name: "clk", dir: "Input", width: "1 bit", desc: "System clock" },
+        { name: "rst", dir: "Input", width: "1 bit", desc: "Synchronous active-high reset" },
+        { name: "edit_request", dir: "Input", width: "1 bit", desc: "Requests an edit operation" },
+        { name: "genome_in", dir: "Input", width: "64 bits", desc: "Original 32-base genome" },
+        { name: "edit_position", dir: "Input", width: "5 bits", desc: "Starting base index of the edit (valid 0–28)" },
+        { name: "replacement", dir: "Input", width: "8 bits", desc: "Four-base replacement sequence" },
+        { name: "genome_out", dir: "Output", width: "64 bits", desc: "Resulting edited 32-base genome" },
+        { name: "edit_success", dir: "Output", width: "1 bit", desc: "Indicates a successful edit" },
+        { name: "done", dir: "Output", width: "1 bit", desc: "Indicates request completion" }
+      ],
+      functionalRequirements: [
+        "Replace exactly four consecutive bases beginning at 'edit_position'.",
+        "Accept only starting positions from 0 through 28, inclusive.",
+        "Preserve all bases outside the selected four-base region.",
+        "Reject invalid edit positions (edit_position > 28).",
+        "Ensure a rejected request does not modify the genome (genome_out matches genome_in).",
+        "Assert 'done' and indicate whether the edit succeeded via 'edit_success'."
+      ]
+    },
+    {
+      id: "M05",
+      name: "edit_verifier",
+      fullName: "<group_id>_edit_verifier",
+      title: "Module 5: Edit Verifier",
+      points: 20,
+      objective: "Independently verify that the Genome Editor performed the intended substitution without introducing unintended changes.",
+      signals: [
+        { name: "clk", dir: "Input", width: "1 bit", desc: "System clock" },
+        { name: "rst", dir: "Input", width: "1 bit", desc: "Synchronous active-high reset" },
+        { name: "verify_request", dir: "Input", width: "1 bit", desc: "Starts verification operation" },
+        { name: "genome_original", dir: "Input", width: "64 bits", desc: "Original unedited genome" },
+        { name: "genome_edited", dir: "Input", width: "64 bits", desc: "Actual edited genome from Editor" },
+        { name: "edit_position", dir: "Input", width: "5 bits", desc: "Starting base index of the intended edit" },
+        { name: "replacement", dir: "Input", width: "8 bits", desc: "Intended 4-base replacement sequence" },
+        { name: "verify_pass", dir: "Output", width: "1 bit", desc: "Asserted when actual result matches expected result exactly" },
+        { name: "mismatch_count", dir: "Output", width: "6 bits", desc: "Number of differing bases between expected and actual (0–32)" },
+        { name: "done", dir: "Output", width: "1 bit", desc: "Indicates verification completion" }
+      ],
+      functionalRequirements: [
+        "Independently construct the expected edited genome using genome_original, edit_position, and replacement.",
+        "Compare the expected genome against actual genome_edited across all 32 bases.",
+        "Assert 'verify_pass' only when expected and actual genomes match exactly across all 32 bases.",
+        "Report the number of differing DNA bases in 'mismatch_count'.",
+        "Assert 'done' when verification is complete.",
+        "Reconstruct the expected result independently without relying solely on the Editor's 'edit_success' signal."
+      ]
+    }
   ],
+
+  generalRequirements: [
+    "Use synthesizable Verilog-2001.",
+    "Use the exact required signal names, widths, and directions as specified in this document.",
+    "Use a rising-edge clock (posedge clk) and synchronous active-high reset (rst) for sequential modules.",
+    "Avoid unintended latch inference (ensure complete case/if assignments).",
+    "Avoid simulation-only delays (#delay) in synthesizable logic.",
+    "Handle relevant boundary conditions and invalid requests deterministically.",
+    "Remain compatible with the module interfaces specified in this document.",
+    "Each team must write its own RTL implementation. No prewritten logic skeletons will be supplied."
+  ],
+
   deliverables: [
-    "Synthesizable Verilog / SystemVerilog source files (neura_core_top.v and child modules)",
-    "Vivado Timing Summary Report demonstrating zero timing violations (Setup, Hold, Pulse Width)",
-    "Self-checking testbench (tb_neura_core.sv) simulating 10,000 synthetic market ticks with zero dropped packets",
-    "A 2-page Architecture Architecture Brief documenting pipeline stage latency and resource utilization (LUTs, FFs, BRAMs, DSPs)"
+    "Verilog source files for all five modules (<group_id>_<module_name>.v)",
+    "A self-checking testbench for each module (tb_<group_id>_<module_name>.v)",
+    "Simulation results / waveform logs demonstrating correct operation",
+    "Test cases covering normal operation and boundary edge cases",
+    "A brief explanation of each design architecture and its operation"
+  ],
+
+  evaluationRubric: [
+    { module: "Guide Matcher", points: 15, key: "Matching accuracy, threshold handling (0-2)" },
+    { module: "Genome Window Generator", points: 20, key: "Boundary overlapping windows, valid signal timing" },
+    { module: "Target Locator", points: 20, key: "Leftmost target detection, 0-24 index scanning, done handshake" },
+    { module: "Genome Editor", points: 20, key: "4-base substitution, 0-28 position guard, untouched preservation" },
+    { module: "Edit Verifier", points: 20, key: "Independent expected reconstruction, 32-base full comparison" },
+    { module: "Design explanation & test quality", points: 5, key: "Architecture documentation and test coverage" }
   ]
 };

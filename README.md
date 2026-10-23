@@ -19,24 +19,19 @@
    - Clean, modern, highly legible typography using `Inter` paired with `JetBrains Mono` for hardware code, signals, and hex addresses.
    - Built-in zero-dependency **Web Audio API synthesizer** generating real-time hardware clicks, high-voltage zaps, success chimes, and victory fanfares (with mute/unmute toggle).
 
-3. **10 Sequential Statement Puzzles**
-   - **Stage 01: The Ground Wire Anomaly** (K-Map min-term octet reduction)
-   - **Stage 02: Clock Jitter on Pin 9** (Verilog non-blocking `<=` delta-cycle race prevention)
-   - **Stage 03: The Metastable Flip-Flop** (2-FF synchronizer topology & MTBF)
-   - **Stage 04: FSM State Lockout** (One-hot encoding for high-speed FPGA LUTs)
-   - **Stage 05: The Ghost in the LFSR** (XOR LFSR all-zero lockup trap)
-   - **Stage 06: ALU Overflow Bit Paradox** (Two's complement signed carry XOR condition)
-   - **Stage 07: Memory Collision in BRAM** (True Dual-Port RAM `WRITE_FIRST` mode)
-   - **Stage 08: Async FIFO Gray Code** (Gray pointer conversion `G = B ^ (B >> 1)`)
-   - **Stage 09: UART Baud Rate Divisor** (50 MHz to 115,200 baud integer divisor `27`)
-   - **Stage 10: FPGA Bitstream Sync Word** (Xilinx 32-bit sync word `0xAA995566`)
+3. **5 Sequential Statement Puzzles**
+   - **Stage 01: Multi-Flag Error Aggregator** (3-flag adder: `assign error_count = err1 + err2 + err3;`)
+   - **Stage 02: Symbol Pipeline History Shift Register** (2-stage temporal shift buffer: `always @(posedge clk) history <= {history[1:0], sym_in};`)
+   - **Stage 03: Bus Mask Slicing & Injection** (Middle nibble replacement: `assign data_out = {data_in[7:6], 4'b1111, data_in[1:0]};`)
+   - **Stage 04: Multi-Driver Conflict Resolution** (Single always block: `always @(posedge clk) if (stop) flag <= 0; else if (start) flag <= 1;`)
+   - **Stage 05: 1-Cycle Latency Verification Monitor** (Pipeline delay checking: `always @(posedge clk) dly_reg <= data_in; assign error = (data_out != dly_reg);`)
    - Sequential unlocking: Stage $N$ requires Stage $N-1$ to be solved.
-   - Instant verification feedback, interactive hint system with time penalties, and code copy tools.
+   - Smart syntax-aware Verilog answer normalizer accepting variations in spacing, semicolons, and operator notations.
 
-4. **Grand Final Problem Decryption Matrix**
-   - **PROJECT NEURA-CORE**: 250 MHz Zero-Latency Triangular Arbitrage Co-Processor on Xilinx Artix-7.
-   - Each solved stage compiles 1 of 10 architectural fragments.
-   - When all 10 are solved, unlocks the full synthesizable top-level Verilog template (`neura_core_top.v`), testbench specification, timing constraint criteria (WNS > 0.0 ns), and submission portal.
+4. **Grand Final Problem Decryption Matrix: GENOME-X**
+   - **GENOME-X**: Synthetic Genome Editing and Verification Engine (Year 2089 Mission).
+   - Each solved stage compiles 1 of 5 architectural module blueprints (`<group_id>_guide_matcher`, `<group_id>_genome_window_generator`, `<group_id>_target_locator`, `<group_id>_genome_editor`, `<group_id>_edit_verifier`).
+   - Solving all 5 puzzles unlocks the full 10-part specification, DNA base encoding tables, signal interfaces, dynamic group identifier starter package generator, and GitHub submission portal.
 
 5. **Live Leaderboard & Live Analysis**
    - Real-time ranking with podium medals, stage-by-stage decryption matrix, completion timestamps, and penalty tracking.

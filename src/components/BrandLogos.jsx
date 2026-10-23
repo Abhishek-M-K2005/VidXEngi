@@ -1,4 +1,5 @@
 import React from 'react';
+import { Zap } from 'lucide-react';
 
 // Official ACM NITK Student Chapter Logo using /assets/ACM.png
 // ACM.png is 1080x1080 with 790x272 of actual content centered (x: 135-925, y: 405-677).
@@ -104,8 +105,8 @@ export const EngineerNitkLogo = ({ className = "", size = "normal" }) => {
 // ACM NITK Vidyut SIG Crest
 export const VidyutLogo = ({ className = "h-7" }) => (
   <div className={`inline-flex items-center gap-2 select-none ${className}`}>
-    <div className="w-7 h-7 rounded-lg bg-[#141518] border border-[#23252b] flex items-center justify-center text-[#00e5ff] font-mono font-bold text-xs">
-      ⚡
+    <div className="w-7 h-7 rounded-lg bg-[#141518] border border-[#23252b] flex items-center justify-center text-[#00e5ff]">
+      <Zap className="w-3.5 h-3.5 text-[#00e5ff]" />
     </div>
     <div className="text-left leading-tight hidden md:block">
       <span className="text-[11px] font-bold text-white tracking-wide block">VIDYUT</span>

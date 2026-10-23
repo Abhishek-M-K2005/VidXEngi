@@ -28,10 +28,13 @@ import {
   Users,
   KeyRound,
   ShieldAlert,
-  Globe
+  Globe,
+  Lock,
+  Dna
 } from 'lucide-react';
 import { soundFx } from '../utils/sound';
 import { sessionManager } from '../utils/sessionManager';
+import { FINAL_PROBLEM_STATEMENT } from '../data/puzzles';
 
 export const LiveAnalysisView = ({
   teams,
@@ -57,7 +60,7 @@ export const LiveAnalysisView = ({
   const [newTeamCollege, setNewTeamCollege] = useState('NITK Surathkal');
   const [newTeamMembers, setNewTeamMembers] = useState('');
   const [newTeamPasscode, setNewTeamPasscode] = useState('');
-  const [newTeamAvatar, setNewTeamAvatar] = useState('⚡');
+  const [newTeamAvatar, setNewTeamAvatar] = useState('CORE');
   const [showPasscodes, setShowPasscodes] = useState(false);
 
   const handleCreateTeamSubmit = (e) => {
@@ -82,10 +85,48 @@ export const LiveAnalysisView = ({
 
   const competingTeams = teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut');
   const totalTeams = competingTeams.length;
-  const totalSolves = competingTeams.reduce((acc, t) => acc + t.solvedPuzzles.length, 0);
+  const totalSolves = competingTeams.reduce((acc, t) => acc + (t.solvedPuzzles?.length || 0), 0);
+  // Get the definitive timestamp when a team completed all 5 puzzles (or their last solve)
+  const getTeamCompletionTime = (t) => {
+    if (!t) return 0;
+    if (t.completedAllAt) return t.completedAllAt;
+    if (t.puzzleSolveTimestamps && t.puzzleSolveTimestamps[5]) return t.puzzleSolveTimestamps[5];
+    const vals = Object.values(t.puzzleSolveTimestamps || {});
+    return vals.length > 0 ? Math.max(...vals) : (t.lastActive || 0);
+  };
+
   const leaderTeam = competingTeams.length > 0 
-    ? [...competingTeams].sort((a, b) => b.solvedPuzzles.length - a.solvedPuzzles.length || b.score - a.score)[0]
+    ? [...competingTeams].sort((a, b) => {
+        const aCount = a.solvedPuzzles.length;
+        const bCount = b.solvedPuzzles.length;
+        const isACompleted = aCount === puzzles.length;
+        const isBCompleted = bCount === puzzles.length;
+
+        if (isACompleted && isBCompleted) {
+          const aTime = getTeamCompletionTime(a);
+          const bTime = getTeamCompletionTime(b);
+          if (aTime && bTime && aTime !== bTime) {
+            return aTime - bTime;
+          }
+          if (b.score !== a.score) return b.score - a.score;
+          return a.penaltyMinutes - b.penaltyMinutes;
+        }
+
+        if (isACompleted) return -1;
+        if (isBCompleted) return 1;
+
+        if (bCount !== aCount) return bCount - aCount;
+        const aLastTime = getTeamCompletionTime(a);
+        const bLastTime = getTeamCompletionTime(b);
+        if (aLastTime && bLastTime && aLastTime !== bLastTime) {
+          return aLastTime - bLastTime;
+        }
+        if (b.score !== a.score) return b.score - a.score;
+        return a.penaltyMinutes - b.penaltyMinutes;
+      })[0]
     : null;
+  const genomeXQualifiedTeams = competingTeams.filter((t) => t.solvedPuzzles.length === puzzles.length);
+  const genomeXUnlockRate = totalTeams > 0 ? Math.round((genomeXQualifiedTeams.length / totalTeams) * 100) : 0;
 
   // Compute global average solve duration dynamically
   let globalTotalDurationMs = 0;
@@ -158,7 +199,7 @@ export const LiveAnalysisView = ({
     if (!broadcastText.trim()) return;
     soundFx.playZap();
     if (onBroadcast) {
-      onBroadcast(`📢 [ORGANIZER BROADCAST]: ${broadcastText.trim()}`);
+      onBroadcast(`[ORGANIZER BROADCAST]: ${broadcastText.trim()}`);
     }
     setBroadcastText('');
   };
@@ -281,7 +322,7 @@ export const LiveAnalysisView = ({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-zinc-600">&bull;</span>
-            <span>Submission Queue:</span>
+            <span>Telemetry Latency:</span>
             <span className="text-white font-semibold">0 ms wait</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -303,9 +344,9 @@ export const LiveAnalysisView = ({
         </div>
 
         <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
-          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Verified Solves</div>
+          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Phase 1 Solves</div>
           <div className="text-2xl font-black text-[#00e5ff] font-mono mt-1">{totalSolves} Solves</div>
-          <div className="text-[11px] text-zinc-400 mt-1 font-mono">Across 10 hardware stages</div>
+          <div className="text-[11px] text-zinc-400 mt-1 font-mono">Across {puzzles.length} statement puzzles</div>
         </div>
 
         <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
@@ -317,12 +358,14 @@ export const LiveAnalysisView = ({
         </div>
 
         <div className="p-4 rounded-xl bg-[#121316] border border-[#1f2127]">
-          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Leader Pace</div>
+          <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">Round 1 Qualification</div>
           <div className="text-2xl font-black text-purple-400 font-mono mt-1">
-            {leaderTeam ? `${leaderTeam.solvedPuzzles.length} / 10 Stages` : '0 / 10 Stages'}
+            {genomeXQualifiedTeams.length} / {totalTeams}
           </div>
           <div className="text-[11px] text-zinc-400 mt-1 font-mono truncate">
-            {leaderTeam ? `${leaderTeam.name} (${leaderTeam.college})` : 'Awaiting team solves'}
+            {genomeXQualifiedTeams.length > 0 
+              ? `${genomeXUnlockRate}% qualified for GENOME-X` 
+              : `Pace: ${leaderTeam ? `${leaderTeam.name} (${leaderTeam.solvedPuzzles.length}/${puzzles.length})` : 'Awaiting solves'}`}
           </div>
         </div>
       </div>
@@ -506,21 +549,20 @@ export const LiveAnalysisView = ({
                     </div>
 
                     <div>
-                      <label className="block text-zinc-400 font-mono mb-1">Avatar Crest</label>
+                      <label className="block text-zinc-400 font-mono mb-1">Subsystem Callsign</label>
                       <select
                         value={newTeamAvatar}
                         onChange={(e) => setNewTeamAvatar(e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
                       >
-                        <option value="⚡">⚡ Lightning Core</option>
-                        <option value="🔥">🔥 Thermal Overclock</option>
-                        <option value="👾">👾 Bit Inverter</option>
-                        <option value="🛡️">🛡️ Fault Tolerant</option>
-                        <option value="🌊">🌊 Silicon Surfer</option>
-                        <option value="🚪">🚪 Logic Gate</option>
-                        <option value="🐍">🐍 Verilog Viper</option>
-                        <option value="👑">👑 NAND Lord</option>
-                        <option value="💎">💎 Silicon Crystal</option>
+                        <option value="CORE">CORE // Processing Unit</option>
+                        <option value="LOGIC">LOGIC // Combinational Logic</option>
+                        <option value="FPGA">FPGA // Matrix Array</option>
+                        <option value="SYNTH">SYNTH // RTL Synthesis</option>
+                        <option value="CLOCK">CLOCK // PLL Oscillator</option>
+                        <option value="RISC">RISC // Pipeline Unit</option>
+                        <option value="NAND">NAND // Primitive Gate</option>
+                        <option value="TRACE">TRACE // Bus Analyzer</option>
                       </select>
                     </div>
                   </div>
@@ -601,7 +643,7 @@ export const LiveAnalysisView = ({
                               {t.ipHistory && t.ipHistory.length > 1 && (
                                 <div className="text-amber-400 font-bold flex items-center gap-1 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/60">
                                   <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-                                  <span>⚠️ Fraud Risk Alert: {t.ipHistory.length} distinct IPs recorded ({t.ipHistory.join(', ')})</span>
+                                  <span>Fraud Risk Alert: {t.ipHistory.length} distinct IPs recorded ({t.ipHistory.join(', ')})</span>
                                 </div>
                               )}
                             </div>
@@ -683,16 +725,16 @@ export const LiveAnalysisView = ({
         )}
       </div>
 
-      {/* ── 4. TWO-COLUMN MONITOR: LIVE SUBMISSION AUDIT & TEAM INSPECTOR ── */}
+      {/* ── 4. TWO-COLUMN MONITOR: LIVE ACTIVITY AUDIT & TEAM INSPECTOR ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        {/* Left Column: Live Submission Stream & Audit Log (7 cols) */}
+        {/* Left Column: Live Activity Stream & Audit Log (7 cols) */}
         <div className="lg:col-span-7 rounded-2xl border border-[#202227] bg-[#111215] overflow-hidden flex flex-col">
           <div className="p-4 border-b border-[#1d1f24] bg-[#0e0f12] flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-[#00e5ff]" />
               <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                Live Submission &amp; Audit Stream
+                Live Activity &amp; Audit Stream
               </h3>
             </div>
 
@@ -725,7 +767,7 @@ export const LiveAnalysisView = ({
               </div>
             ) : (
               filteredLogs.map((log) => {
-                const dateStr = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateStr = new Date(log.timestamp).toLocaleString();
                 const isSolve = log.type === 'SOLVE' || log.type === 'FINISH_ALL';
                 const isMilestone = log.type === 'FINISH_ALL' || log.type === 'MILESTONE_5';
 
@@ -807,7 +849,7 @@ export const LiveAnalysisView = ({
                   >
                     {competingTeams.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({t.college}) &bull; {t.solvedPuzzles.length}/10 Solved ({t.score} pts)
+                        {t.name} ({t.college}) &bull; {t.solvedPuzzles.length}/{puzzles.length} Solved ({t.score} pts)
                       </option>
                     ))}
                   </select>
@@ -836,8 +878,8 @@ export const LiveAnalysisView = ({
                     {/* Stage Matrix Checklist */}
                     <div>
                       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-                        <span>10-Stage Decryption Grid</span>
-                        <span>{inspectedTeam.solvedPuzzles.length} of 10 Unlocked</span>
+                        <span>Phase 1 Decryption Grid (5 Stages)</span>
+                        <span>{inspectedTeam.solvedPuzzles.length} of {puzzles.length} Solved</span>
                       </div>
 
                       <div className="grid grid-cols-5 gap-1.5 font-mono text-xs">
@@ -848,32 +890,74 @@ export const LiveAnalysisView = ({
                               key={p.id}
                               className={`p-2 rounded-lg border text-center transition ${
                                 isSolved
-                                  ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 font-bold'
+                                  ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 font-bold shadow-[0_0_8px_rgba(16,185,129,0.15)]'
                                   : 'bg-[#141518] border-[#22242a] text-zinc-600'
                               }`}
                               title={`Stage 0${p.id}: ${p.title} (${isSolved ? 'SOLVED' : 'LOCKED'})`}
                             >
                               <div className="text-[9px] uppercase">S0{p.id}</div>
-                              <div className="mt-0.5">{isSolved ? '✓' : '—'}</div>
+                              <div className="mt-0.5">{isSolved ? <CheckCircle2 className="w-3 h-3 text-emerald-400 mx-auto" /> : '—'}</div>
                             </div>
                           );
                         })}
                       </div>
+
+                      {/* Round 1: GENOME-X Access Status */}
+                      {inspectedTeam.solvedPuzzles.length === puzzles.length ? (
+                        <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 flex items-center justify-between text-xs font-mono">
+                          <div className="flex items-center gap-2">
+                            <Dna className="w-4 h-4 text-[#00e5ff] animate-pulse" />
+                            <div>
+                              <div className="font-bold text-white text-[11px] flex items-center gap-1.5">
+                                <span>ROUND 1: GENOME-X UNLOCKED</span>
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-900/60 text-emerald-300 font-bold">100 PTS</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-400">All 5 module blueprints decrypted &bull; RTL Synthesis Gateway Open</div>
+                            </div>
+                          </div>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        </div>
+                      ) : (
+                        <div className="mt-2.5 p-2.5 rounded-xl bg-[#14151a] border border-[#232530] flex items-center justify-between text-xs font-mono">
+                          <div className="flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-amber-400" />
+                            <div>
+                              <div className="font-bold text-zinc-300 text-[11px] flex items-center gap-1.5">
+                                <span>ROUND 1: GENOME-X LOCKED</span>
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40">AIR-GAP SECURED</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-500">Requires {puzzles.length - inspectedTeam.solvedPuzzles.length} more stage decryption(s)</div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-amber-400">{inspectedTeam.solvedPuzzles.length}/{puzzles.length}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Timing & Integrity Readout */}
                     <div className="p-3 rounded-xl bg-[#0e0f11] border border-[#1e2025] text-[11px] font-mono space-y-1.5">
                       <div className="flex justify-between text-zinc-400">
                         <span>Synthesis Bitstream:</span>
-                        <span className="text-cyan-400 font-bold">{Math.round((inspectedTeam.solvedPuzzles.length / 10) * 100)}% Complete</span>
+                        <span className="text-cyan-400 font-bold">{Math.round((inspectedTeam.solvedPuzzles.length / puzzles.length) * 100)}% Complete</span>
                       </div>
                       <div className="flex justify-between text-zinc-400">
                         <span>Anomaly Detection:</span>
                         <span className="text-emerald-400 font-bold">0 Flagged (No Violations)</span>
                       </div>
+                      {inspectedTeam.solvedPuzzles.length === puzzles.length && (
+                        <div className="flex justify-between text-zinc-400">
+                          <span>5/5 Completion:</span>
+                          <span className="text-emerald-300 font-bold">
+                            {(() => {
+                              const cTime = getTeamCompletionTime(inspectedTeam);
+                              return cTime ? new Date(cTime).toLocaleString() : '—';
+                            })()}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-zinc-400">
                         <span>Last Telemetry Sync:</span>
-                        <span className="text-white">{inspectedTeam.lastActive ? new Date(inspectedTeam.lastActive).toLocaleTimeString() : '—'}</span>
+                        <span className="text-white">{inspectedTeam.lastActive ? new Date(inspectedTeam.lastActive).toLocaleString() : '—'}</span>
                       </div>
                     </div>
 
@@ -899,7 +983,7 @@ export const LiveAnalysisView = ({
                                 ? 'bg-amber-950 text-amber-300 border border-amber-700 animate-pulse'
                                 : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                             }`}>
-                              {isMultiIp ? '⚠️ MULTI-IP ALERT' : 'VERIFIED IP'}
+                              {isMultiIp ? 'MULTI-IP ANOMALY' : 'VERIFIED IP'}
                             </span>
                           </div>
 
@@ -941,9 +1025,9 @@ export const LiveAnalysisView = ({
         <div className="p-4 border-b border-[#1d1f24] bg-[#0e0f12] flex items-center justify-between">
           <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Timer className="w-4 h-4 text-[#00e5ff]" />
-            Hardware Stage Clearance &amp; Friction Matrix (Stage 01 &ndash; Stage 10)
+            Hardware Stage Clearance &amp; Friction Matrix (Stage 01 &ndash; Stage 0{puzzles.length})
           </h3>
-          <span className="text-xs text-zinc-500 font-mono">Live Proctored Analysis</span>
+          <span className="text-xs text-zinc-500 font-mono">Phase 1 Puzzles &bull; Round 1 Gateway</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -1015,6 +1099,68 @@ export const LiveAnalysisView = ({
                   </td>
                 </tr>
               ))}
+
+              {/* Grand Round 1 Problem Gateway Row */}
+              <tr className="bg-[#121921] border-t-2 border-[#00e5ff]/30 font-bold hover:bg-[#151e28] transition">
+                <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
+                  <div className="flex items-center gap-1.5">
+                    <Dna className="w-3.5 h-3.5 text-[#00e5ff] animate-pulse" />
+                    <span>ROUND 1</span>
+                  </div>
+                </td>
+                <td className="py-3.5 px-4">
+                  <div className="font-bold text-white flex items-center gap-2">
+                    <span>GENOME-X: Synthetic Genome Editing Engine</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono">
+                      100 PTS
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-zinc-400 font-normal mt-0.5">
+                    Unlocked after all 5 puzzles &bull; 5 synthesizable Verilog modules (&lt;group_id&gt;_*)
+                  </div>
+                </td>
+                <td className="py-3.5 px-3">
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-[#1a1c24] text-[#00e5ff] border border-[#2b3545]">
+                    FPGA SYNTHESIS
+                  </span>
+                </td>
+                <td className="py-3.5 px-3">
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-20 h-2 bg-[#1b1d22] rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-400 rounded-full"
+                        style={{ width: `${genomeXUnlockRate}%` }}
+                      />
+                    </div>
+                    <span className="font-mono font-bold text-emerald-400 text-[11px]">
+                      {genomeXUnlockRate}% ({genomeXQualifiedTeams.length}/{totalTeams})
+                    </span>
+                  </div>
+                </td>
+                <td className="py-3.5 px-3 text-center font-mono">
+                  {genomeXQualifiedTeams.length > 0 ? (
+                    <span className="text-emerald-400 font-semibold text-[11px]">
+                      {genomeXQualifiedTeams[0].name} <span className="text-zinc-500 font-sans text-[10px]">(First)</span>
+                    </span>
+                  ) : (
+                    <span className="text-zinc-600">—</span>
+                  )}
+                </td>
+                <td className="py-3.5 px-3 text-center font-mono text-zinc-400">
+                  {genomeXQualifiedTeams.length > 0 ? `${genomeXQualifiedTeams.length} Unlocked` : '—'}
+                </td>
+                <td className="py-3.5 px-4 text-right">
+                  {genomeXQualifiedTeams.length > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800 text-[10px] font-mono font-bold">
+                      <Sparkles className="w-3 h-3 text-[#00e5ff]" /> ACTIVE
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 text-[10px] font-mono font-bold">
+                      <Lock className="w-3 h-3" /> AIR-GAP LOCKED
+                    </span>
+                  )}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

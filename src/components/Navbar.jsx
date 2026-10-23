@@ -30,7 +30,7 @@ export const Navbar = ({
   const percentDecrypted = Math.round((solvedCount / totalPuzzles) * 100);
 
   const NAV_ITEMS = [
-    { id: 'puzzles',       label: '10 Puzzles',       icon: Cpu },
+    { id: 'puzzles',       label: `${totalPuzzles || 5} Puzzles`,       icon: Cpu },
     { id: 'final-problem', label: 'Grand Problem',    icon: Key },
     { id: 'leaderboard',   label: 'Live Standings',   icon: Trophy, live: true },
     { id: 'analysis',      label: 'Live Monitor',     icon: Activity, live: true },
@@ -88,8 +88,12 @@ export const Navbar = ({
                 <span>{label}</span>
                 {live && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
                 {id === 'final-problem' && (
-                  <span className="text-[10px] font-mono text-amber-400 bg-amber-950/40 px-1 rounded border border-amber-800/40">
-                    {percentDecrypted}%
+                  <span className={`text-[10px] font-mono px-1 rounded border ${
+                    solvedCount >= totalPuzzles
+                      ? 'text-emerald-400 bg-emerald-950/50 border-emerald-800/60 font-bold'
+                      : 'text-amber-400 bg-amber-950/40 border-amber-800/40'
+                  }`}>
+                    {solvedCount >= totalPuzzles ? 'UNLOCKED' : `${percentDecrypted}%`}
                   </span>
                 )}
               </button>
@@ -108,9 +112,13 @@ export const Navbar = ({
               <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold border ${
                 activeTeam.isAdmin
                   ? 'bg-amber-500/20 text-amber-400 border-amber-400/50'
-                  : 'bg-[#191a1e] text-amber-400 border-[#282a31]'
+                  : 'bg-[#191a1e] text-[#00e5ff] border-[#282a31]'
               }`}>
-                {activeTeam.avatarSeed || (activeTeam.isAdmin ? '👑' : '⚡')}
+                {activeTeam.isAdmin ? (
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                ) : (
+                  <span className="font-mono text-[10px]">{activeTeam.avatarSeed ? activeTeam.avatarSeed.slice(0, 2) : <Cpu className="w-3 h-3 text-[#00e5ff]" />}</span>
+                )}
               </div>
               <div className="hidden sm:block text-left">
                 <div className="flex items-center gap-1.5">
@@ -137,7 +145,7 @@ export const Navbar = ({
                   {activeTeam.isAdmin ? (
                     <span className="text-amber-400/80">Proctoring Active</span>
                   ) : (
-                    `${solvedCount}/10 · ${activeTeam.score} pts`
+                    `${solvedCount}/${totalPuzzles || 5} · ${activeTeam.score} pts`
                   )}
                 </div>
               </div>

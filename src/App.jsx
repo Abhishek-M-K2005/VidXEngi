@@ -31,20 +31,24 @@ export const App = () => {
   const [isCollisionModalOpen, setIsCollisionModalOpen] = useState(false);
   const [displacedTeam, setDisplacedTeam] = useState(null);
 
-  // Initialize Teams from localStorage (in production, purge any legacy seeded dummy teams)
+  // Initialize Teams from localStorage with reliable fallback to INITIAL_TEAMS
   const [teams, setTeams] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('vq_prod_teams_v1') || localStorage.getItem('vq_teams_data');
+      const saved = localStorage.getItem('vq_teams_data') || localStorage.getItem('vq_prod_teams_v1');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Filter out legacy demo teams
-          const DEMO_IDS = [
-            'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
-            'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
-          ];
-          const clean = parsed.filter((t) => !DEMO_IDS.includes(t.id));
-          return clean;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Filter out legacy dummy demo teams
+            const DEMO_IDS = [
+              'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
+              'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
+            ];
+            const clean = parsed.filter((t) => !DEMO_IDS.includes(t.id));
+            if (clean.length > 0) {
+              return clean;
+            }
+          }
         } catch {
           // fallback
         }
@@ -127,6 +131,7 @@ export const App = () => {
   // Persist teams to localStorage
   useEffect(() => {
     localStorage.setItem('vq_teams_data', JSON.stringify(teams));
+    localStorage.setItem('vq_prod_teams_v1', JSON.stringify(teams));
   }, [teams]);
 
   // Persist active team
@@ -169,11 +174,26 @@ export const App = () => {
     const puzzle = PUZZLES.find((p) => p.id === puzzleId);
     if (!puzzle) return false;
 
-    // Normalize answer: remove quotes, spaces, lowercase
+    // Robust Verilog code normalization helper
+    const normalizeVerilog = (str) => {
+      return String(str || '')
+        .toLowerCase()
+        .replace(/['"`]/g, '')
+        .replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '') // remove comments
+        .replace(/\b1'b([01])\b/g, '$1') // normalize 1'b0 -> 0, 1'b1 -> 1
+        .replace(/\s+/g, ' ')
+        .replace(/\s*;\s*$/, '') // remove trailing semicolon
+        .replace(/\s*([=+\-*{};:,()<>!&|^~])\s*/g, '$1') // normalize whitespace around operators
+        .trim();
+    };
+
     const cleanInput = rawAnswer.trim().toLowerCase().replace(/['"`]/g, '');
+    const normInput = normalizeVerilog(rawAnswer);
+
     const isCorrect = puzzle.acceptedAnswers.some((ans) => {
       const cleanAns = ans.trim().toLowerCase().replace(/['"`]/g, '');
-      return cleanAns === cleanInput;
+      const normAns = normalizeVerilog(ans);
+      return cleanAns === cleanInput || normAns === normInput;
     });
 
     if (isCorrect) {
@@ -191,6 +211,8 @@ export const App = () => {
         ...activeTeam.puzzleSolveTimestamps,
         [puzzleId]: now
       };
+      const isAllSolved = updatedSolved.length === PUZZLES.length;
+      const completedAllAt = isAllSolved ? (activeTeam.completedAllAt || now) : activeTeam.completedAllAt;
       const updatedIpHistory = Array.from(new Set([...(activeTeam.ipHistory || []), clientIp]));
 
       const updatedTeam = {
@@ -201,7 +223,8 @@ export const App = () => {
         lastActive: now,
         lastIp: clientIp,
         networkOrg,
-        ipHistory: updatedIpHistory
+        ipHistory: updatedIpHistory,
+        ...(completedAllAt ? { completedAllAt } : {})
       };
 
       setTeams((prev) => prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t)));
@@ -216,14 +239,18 @@ export const App = () => {
         puzzleTitle: puzzle.title,
         clientIp,
         networkOrg,
-        type: updatedSolved.length === 10 ? 'FINISH_ALL' : updatedSolved.length === 5 ? 'MILESTONE_5' : 'SOLVE',
-        message: updatedSolved.length === 10 
-          ? `🏆 ALL 10 STAGES COMPLETED! Transmitted Golden RTL Bitstream!` 
+        type: isAllSolved ? 'FINISH_ALL' : 'SOLVE',
+        message: isAllSolved 
+          ? `[ALL STAGES CLEARED] Grand Problem Statement Unlocked!` 
           : `Decrypted Stage 0${puzzle.id}! +${puzzle.points} pts awarded.`
       };
 
       setActivityLogs((prev) => [newEvent, ...prev.slice(0, 30)]);
-      showToast(`⚡ Stage 0${puzzle.id} Decrypted! Fragment 0${puzzle.id} compiled.`);
+      showToast(
+        isAllSolved
+          ? `[UNLOCKED] Stage 0${puzzle.id} Decrypted! Round 1: GENOME-X Unlocked!`
+          : `Stage 0${puzzle.id} Decrypted! Fragment 0${puzzle.id} compiled.`
+      );
       return true;
     }
 
@@ -252,7 +279,7 @@ export const App = () => {
 
     setTeams((prev) => prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t)));
 
-    showToast(`⚠️ Hint unlocked (+${puzzle.hintPenaltyMinutes}m timing penalty).`);
+    showToast(`Hint unlocked (+${puzzle.hintPenaltyMinutes}m timing penalty).`);
   };
 
   // Switch / Login Team with Single Active Session Registration & IP Audit
@@ -271,7 +298,7 @@ export const App = () => {
     }
 
     showToast(team.isAdmin 
-      ? `👑 Welcome, ACM Vidyut Proctor! Master operations unlocked.` 
+      ? `Welcome, ACM Vidyut Proctor! Master operations unlocked.` 
       : `Welcome back, ${team.name}! (Active Terminal Locked to IP ${clientIp})`
     );
   };
@@ -303,10 +330,10 @@ export const App = () => {
       clientIp: getCachedClientIp(),
       networkOrg: getCachedNetworkOrg(),
       type: 'SOLVE',
-      message: `👑 [ADMIN PROVISIONED]: New team "${newTeam.name}" (${newTeam.college}) authorized.`
+      message: `[ADMIN PROVISIONED]: New team "${newTeam.name}" (${newTeam.college}) authorized.`
     };
     setActivityLogs((prev) => [newEvent, ...prev.slice(0, 30)]);
-    showToast(`👑 Team "${newTeam.name}" successfully provisioned and authorized!`);
+    showToast(`Team "${newTeam.name}" successfully provisioned and authorized!`);
     return newTeam;
   };
 
@@ -343,7 +370,7 @@ export const App = () => {
       setActiveTeamId(targetTeam.id);
       setIsCollisionModalOpen(false);
       setDisplacedSessionInfo(null);
-      showToast(`⚡ Session claimed on this tab! Other tab/device has been locked.`);
+      showToast(`Session claimed on this tab! Other tab/device has been locked.`);
     }
   };
 
@@ -382,7 +409,7 @@ export const App = () => {
     setCurrentTab('puzzles');
     const nextId = (currentTeamSolved.length + 1);
     setTimeout(() => {
-      const el = document.getElementById(`stage-${nextId <= 10 ? nextId : 10}`);
+      const el = document.getElementById(`stage-${nextId <= PUZZLES.length ? nextId : PUZZLES.length}`);
       el?.scrollIntoView({ behavior: 'smooth' });
     }, 150);
   };
@@ -401,7 +428,7 @@ export const App = () => {
     if (!isSimulating) return;
 
     const interval = setInterval(() => {
-      const competingTeams = teams.filter((t) => t.id !== activeTeamId && t.solvedPuzzles.length < 10);
+      const competingTeams = teams.filter((t) => !t.isAdmin && t.id !== activeTeamId && t.solvedPuzzles.length < PUZZLES.length);
       if (competingTeams.length === 0) return;
 
       const randomTeam = competingTeams[Math.floor(Math.random() * competingTeams.length)];
@@ -417,16 +444,19 @@ export const App = () => {
         [puzzle.id]: now
       };
 
+      const isAllSolved = updatedSolved.length === PUZZLES.length;
+      const completedAllAt = isAllSolved ? (randomTeam.completedAllAt || now) : randomTeam.completedAllAt;
+
       const updated = {
         ...randomTeam,
         solvedPuzzles: updatedSolved,
         score: updatedScore,
         puzzleSolveTimestamps: updatedTimestamps,
-        lastActive: now
+        lastActive: now,
+        ...(completedAllAt ? { completedAllAt } : {})
       };
 
       setTeams((prev) => prev.map((t) => (t.id === randomTeam.id ? updated : t)));
-
       const newEvent = {
         id: `act_${now}`,
         timestamp: now,
@@ -434,12 +464,18 @@ export const App = () => {
         teamName: randomTeam.name,
         puzzleId: puzzle.id,
         puzzleTitle: puzzle.title,
-        type: 'SOLVE',
-        message: `Decrypted Stage 0${puzzle.id} (${puzzle.title})! Score: ${updatedScore} pts`
+        type: isAllSolved ? 'FINISH_ALL' : 'SOLVE',
+        message: isAllSolved
+          ? `[QUALIFIED] Decrypted Stage 05 (${puzzle.title})! All 5 puzzles solved — Round 1: GENOME-X Unlocked! Score: ${updatedScore} pts`
+          : `Decrypted Stage 0${puzzle.id} (${puzzle.title})! Score: ${updatedScore} pts`
       };
 
       setActivityLogs((prev) => [newEvent, ...prev.slice(0, 30)]);
-      showToast(`⚡ Live Update: ${randomTeam.name} solved Stage 0${puzzle.id}!`);
+      showToast(
+        isAllSolved
+          ? `[QUALIFIED] ${randomTeam.name} solved all 5 puzzles & unlocked Round 1: GENOME-X!`
+          : `Live Update: ${randomTeam.name} solved Stage 0${puzzle.id}!`
+      );
       soundFx.playZap();
     }, 14000);
 

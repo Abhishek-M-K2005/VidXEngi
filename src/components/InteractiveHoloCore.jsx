@@ -113,7 +113,7 @@ export const InteractiveHoloCore = () => {
               ARTIX-7 XC7A
             </div>
             <div className="text-[9px] font-mono text-cyan-400 tracking-tight font-semibold">
-              NEURA-CORE RTL
+              GENOME-X RTL
             </div>
 
             {/* Micro gold pins indicator */}

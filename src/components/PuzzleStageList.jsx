@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PuzzleCard } from './PuzzleCard';
 import { InteractiveHoloCore } from './InteractiveHoloCore';
 import { soundFx } from '../utils/sound';
-import { Key, Search, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
+import { Key, Search, Cpu, ChevronDown, ChevronUp, Check } from 'lucide-react';
 
 export const PuzzleStageList = ({
   puzzles,
@@ -31,7 +31,14 @@ export const PuzzleStageList = ({
     return matchesCat && matchesQuery;
   });
 
-  const categories = ['ALL', 'LOGIC GATES', 'VERILOG RTL', 'TIMING & METASTABILITY', 'FSM ARCHITECTURE', 'FPGA HARDWARE'];
+  const categories = [
+    'ALL', 
+    'COMBINATIONAL LOGIC', 
+    'SEQUENTIAL LOGIC', 
+    'BIT SLICING & CONCATENATION', 
+    'RTL RACE CONDITIONS', 
+    'TIMING & ASSERTION'
+  ];
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
@@ -46,10 +53,10 @@ export const PuzzleStageList = ({
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            10 Stage Decryption Matrix
+            {puzzles.length} Stage Decryption Matrix
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-xl">
-            Each decrypted stage unlocks 10% of the grand FPGA co-processor problem statement. Stages must be solved sequentially.
+            Each decrypted stage unlocks {Math.round(100 / puzzles.length)}% of the grand FPGA co-processor problem statement. Solve all 5 stages to unlock the full Round One challenge.
           </p>
         </div>
 
@@ -91,7 +98,7 @@ export const PuzzleStageList = ({
           <span>Jump to stage</span>
           <span className="text-[#00e5ff] font-bold">{solvedCount} / {puzzles.length} Decrypted</span>
         </div>
-        <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+        <div className="grid grid-cols-5 gap-2">
           {puzzles.map((p) => {
             const isSolved = solvedIds.includes(p.id);
             const isNext = p.id === nextPuzzleId;
@@ -114,8 +121,8 @@ export const PuzzleStageList = ({
                 }`}
               >
                 <span className="text-[11px] font-mono font-bold">P{p.stageNumber}</span>
-                <span className="text-[9px] mt-0.5 font-medium">
-                  {isSolved ? '✓' : isNext ? 'ACTIVE' : '—'}
+                <span className="text-[9px] mt-0.5 font-medium flex items-center justify-center">
+                  {isSolved ? <Check className="w-2.5 h-2.5" /> : isNext ? 'ACTIVE' : '—'}
                 </span>
               </a>
             );

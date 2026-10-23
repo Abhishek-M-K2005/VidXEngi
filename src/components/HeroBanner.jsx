@@ -9,7 +9,8 @@ import {
   Sparkles,
   QrCode,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Cpu
 } from 'lucide-react';
 import { AcmNitkLogo, ArcesiumLogo, EngineerNitkLogo } from './BrandLogos';
 import { DynamicElectricTitle } from './DynamicElectricTitle';
@@ -90,7 +91,7 @@ export const HeroBanner = ({
             </a>
 
             <span className="text-zinc-500 font-light text-2xl sm:text-3xl select-none shrink-0 leading-none px-0.5">
-              ✕
+              &times;
             </span>
 
             <a
@@ -131,7 +132,7 @@ export const HeroBanner = ({
 
         {/* 6. MISSION SUMMARY */}
         <p className="text-xs sm:text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed mb-6">
-          Decode the 10 cryptic statement puzzles sequentially to assemble the master FPGA co-processor bitstream. Live leaderboard tracking by ACM Vidyut × Engineer NITK '26.
+          Decode the 5 cryptic statement puzzles sequentially to assemble the master FPGA co-processor bitstream. Live leaderboard tracking by ACM Vidyut × Engineer NITK '26.
         </p>
 
         {/* 7. POSTER SPECS ROW */}
@@ -161,7 +162,7 @@ export const HeroBanner = ({
             }}
             className="btn-matte-primary"
           >
-            <span>{solvedCount > 0 ? `Resume Stage 0${solvedCount + 1}` : 'Start Decryption Quest'}</span>
+            <span>{solvedCount > 0 ? (solvedCount >= totalPuzzles ? 'Grand Challenge Unlocked' : `Resume Stage 0${solvedCount + 1}`) : 'Start Decryption Quest'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
@@ -194,8 +195,8 @@ export const HeroBanner = ({
             
             {/* Team Progress */}
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#16171b] border border-[#24262d] flex items-center justify-center text-base text-amber-400 font-bold shrink-0">
-                {activeTeam ? activeTeam.avatarSeed : '⚡'}
+              <div className="w-9 h-9 rounded-xl bg-[#16171b] border border-[#24262d] flex items-center justify-center text-sm font-mono text-amber-400 font-bold shrink-0">
+                {activeTeam ? activeTeam.avatarSeed : <Cpu className="w-4 h-4 text-[#00e5ff]" />}
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -210,7 +211,7 @@ export const HeroBanner = ({
                 </div>
                 <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">
                   {activeTeam
-                    ? `Progress: ${solvedCount}/10 Solved (${progress}%)`
+                    ? `Progress: ${solvedCount}/${totalPuzzles} Solved (${progress}%)`
                     : 'Sign in to record your solve times on the live leaderboard'}
                 </div>
               </div>
@@ -262,8 +263,8 @@ export const HeroBanner = ({
             </div>
             
             <div className="p-8 bg-black/60 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#18191d] border border-[#2b2d35] flex items-center justify-center text-3xl">
-                ⚡
+              <div className="w-16 h-16 rounded-2xl bg-[#18191d] border border-[#2b2d35] flex items-center justify-center text-[#00e5ff]">
+                <Cpu className="w-8 h-8 text-[#00e5ff]" />
               </div>
               <div>
                 <h4 className="text-xl font-bold font-display text-white">VERILOG QUEST '26</h4>

@@ -6,7 +6,8 @@ import {
   Laptop, 
   Clock, 
   Terminal, 
-  AlertTriangle 
+  AlertTriangle,
+  Users 
 } from 'lucide-react';
 import { soundFx } from '../utils/sound';
 
@@ -50,7 +51,7 @@ export const SessionCollisionModal = ({
             <div className="flex items-center justify-between text-xs">
               <span className="text-zinc-400">Target Team Profile:</span>
               <span className="font-bold text-white flex items-center gap-1.5">
-                <span className="text-amber-400">{team?.avatarSeed || '⚡'}</span>
+                <Users className="w-3.5 h-3.5 text-amber-400" />
                 <span>{team?.name || 'Assigned Team'}</span>
               </span>
             </div>

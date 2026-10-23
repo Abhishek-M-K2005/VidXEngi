@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, ExternalLink } from 'lucide-react';
+import { Cpu, ExternalLink, Zap } from 'lucide-react';
 import { IICLogo, AcmNitkLogo, AcmDiamondLogo, VidyutLogo, EngineerNitkLogo, ArcesiumLogo } from './BrandLogos';
 
 export const Footer = () => {
@@ -63,8 +63,8 @@ export const Footer = () => {
               <span className="text-white font-engineer font-bold text-xs tracking-wider">ENGINEER '26</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded bg-[#16171b] border border-[#25272e] flex items-center justify-center text-[10px] text-[#00e5ff]">
-                ⚡
+              <div className="w-5 h-5 rounded bg-[#16171b] border border-[#25272e] flex items-center justify-center text-[#00e5ff]">
+                <Zap className="w-3 h-3 text-[#00e5ff]" />
               </div>
               <span className="text-zinc-300 font-medium">ACM Vidyut SIG</span>
             </div>

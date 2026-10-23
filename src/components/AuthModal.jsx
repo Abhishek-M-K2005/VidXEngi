@@ -6,6 +6,7 @@ import {
   KeyRound, 
   X, 
   AlertTriangle, 
+  ShieldAlert,
   ShieldCheck, 
   Laptop, 
   Crown, 
@@ -73,6 +74,15 @@ export const AuthModal = ({
     }
   }, [matchedTeam]);
 
+  // Candidate team from matched passcode or selected dropdown
+  const targetCandidateTeam = matchedTeam || participantTeams.find((t) => t.id === selectedTeamId) || null;
+  const existingActiveSession = targetCandidateTeam ? sessionManager.getActiveSession(targetCandidateTeam.id) : null;
+  const isAnotherInstance = Boolean(existingActiveSession && (
+    existingActiveSession.tabId !== sessionManager.tabId || 
+    existingActiveSession.sessionId !== sessionManager.currentSessionId ||
+    existingActiveSession.deviceId !== sessionManager.deviceId
+  ));
+
   if (!isOpen) return null;
 
   // Handle Team Login
@@ -96,6 +106,21 @@ export const AuthModal = ({
         (t) => t.passcode && t.passcode.trim().toLowerCase() === cleanPass.toLowerCase()
       );
       if (matchByPass) {
+        const existingSession = sessionManager.getActiveSession(matchByPass.id);
+        const isConflict = existingSession && (
+          existingSession.tabId !== sessionManager.tabId || 
+          existingSession.sessionId !== sessionManager.currentSessionId ||
+          existingSession.deviceId !== sessionManager.deviceId
+        );
+
+        if (isConflict) {
+          soundFx.playError();
+          setLoginError(
+            `ACCESS DENIED: Team "${matchByPass.name}" is already logged in on another tab or device (${existingSession.deviceLabel || 'Terminal'}). Contest regulations strictly permit ONE active tab/device per team. Please close the other tab/device or ask an ACM Vidyut admin to reset your session lock.`
+          );
+          return;
+        }
+
         soundFx.playUnlock();
         onLogin(matchByPass);
         onClose();
@@ -107,6 +132,21 @@ export const AuthModal = ({
     const currentTeam = participantTeams.find((t) => t.id === selectedTeamId);
     if (currentTeam) {
       if (!currentTeam.passcode || (cleanPass && currentTeam.passcode.trim().toLowerCase() === cleanPass.toLowerCase())) {
+        const existingSession = sessionManager.getActiveSession(currentTeam.id);
+        const isConflict = existingSession && (
+          existingSession.tabId !== sessionManager.tabId || 
+          existingSession.sessionId !== sessionManager.currentSessionId ||
+          existingSession.deviceId !== sessionManager.deviceId
+        );
+
+        if (isConflict) {
+          soundFx.playError();
+          setLoginError(
+            `ACCESS DENIED: Team "${currentTeam.name}" is already logged in on another tab or device (${existingSession.deviceLabel || 'Terminal'}). Contest regulations strictly permit ONE active tab/device per team. Please close the other tab/device or ask an ACM Vidyut admin to reset your session lock.`
+          );
+          return;
+        }
+
         soundFx.playUnlock();
         onLogin(currentTeam);
         onClose();
@@ -307,34 +347,30 @@ export const AuthModal = ({
                 </div>
               )}
 
-              {/* Single Active Session Warning */}
-              {(() => {
-                if (!selectedTeamId) return null;
-                const existingSession = sessionManager.getActiveSession(selectedTeamId);
-                const isAnotherInstance = existingSession && (
-                  existingSession.tabId !== sessionManager.tabId || 
-                  existingSession.sessionId !== sessionManager.currentSessionId
-                );
-
-                if (isAnotherInstance) {
-                  return (
-                    <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>Active Session Detected Elsewhere</span>
-                      </div>
-                      <div className="text-[11px] text-zinc-300 flex items-center gap-1 font-mono">
-                        <Laptop className="w-3 h-3 text-zinc-500" />
-                        <span>Device: {existingSession.deviceLabel || 'Another Tab / Device'}</span>
-                      </div>
-                      <div className="text-[10px] text-amber-300/80 leading-relaxed pt-0.5">
-                        Logging in will claim and re-route the active session to this workstation.
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
+              {/* Single Active Session Strict Blocker */}
+              {isAnotherInstance && existingActiveSession && (
+                <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/60 text-xs text-rose-200 space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-400">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 animate-pulse" />
+                    <span>CONCURRENT LOGIN BLOCKED · 1 TAB / DEVICE RULE</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">
+                    Team <strong className="text-white font-mono">{targetCandidateTeam?.name}</strong> is currently active on:
+                  </p>
+                  <div className="p-2 rounded bg-black/40 border border-rose-900/60 font-mono text-[11px] text-amber-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Laptop className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>{existingActiveSession.deviceLabel || 'Another Terminal'}</span>
+                    </span>
+                    <span className="text-zinc-500 text-[10px]">
+                      Tab #{existingActiveSession.tabId?.slice(-4)}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-rose-300/80 leading-normal pt-0.5">
+                    Contest regulations strictly permit ONE active tab/device per team. Simultaneous logins are blocked. Please log out from the other instance, or ask an organizer to reset your session lock.
+                  </p>
+                </div>
+              )}
 
               {loginError && (
                 <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-600/60 text-xs text-rose-300">
@@ -344,16 +380,30 @@ export const AuthModal = ({
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-bold text-xs uppercase tracking-wider font-mono shadow-[0_0_20px_rgba(0,240,255,0.3)] transition cursor-pointer flex items-center justify-center gap-2"
+                disabled={isAnotherInstance}
+                className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider font-mono transition flex items-center justify-center gap-2 ${
+                  isAnotherInstance
+                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700'
+                    : 'bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 shadow-[0_0_20px_rgba(0,240,255,0.3)] cursor-pointer'
+                }`}
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>
-                  {matchedTeam 
-                    ? `Sign In as ${matchedTeam.name}` 
-                    : selectedTeamId 
-                      ? 'Confirm Passkey & Enter Dashboard' 
-                      : 'Sign In With Passkey'}
-                </span>
+                {isAnotherInstance ? (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Locked · Active on Another Tab/Device</span>
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>
+                      {matchedTeam 
+                        ? `Sign In as ${matchedTeam.name}` 
+                        : selectedTeamId 
+                          ? 'Confirm Passkey & Enter Dashboard' 
+                          : 'Sign In With Passkey'}
+                    </span>
+                  </>
+                )}
               </button>
 
               <div className="pt-2 border-t border-[#1e2028] text-center space-y-1">

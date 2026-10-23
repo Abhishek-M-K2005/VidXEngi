@@ -16,9 +16,8 @@ export const ADMIN_TEAM = {
   lastActive: Date.now()
 };
 
-// Official Participating Teams for Verilog Quest 2026
-// Each team has an assigned Passkey and Subsystem Callsign (e.g., T07)
-export const INITIAL_TEAMS = [
+// Official Sample Participating Teams for Testing (Can be loaded from Admin Console)
+export const SAMPLE_TEAMS = [
   {
     id: "team_t01_quantum",
     name: "T01_QuantumCircuits",
@@ -160,6 +159,9 @@ export const INITIAL_TEAMS = [
     lastActive: Date.now()
   }
 ];
+
+// Clean slate: Only admin provisions participating teams
+export const INITIAL_TEAMS = [];
 
 // Fresh live event telemetry starts cleanly
 export const INITIAL_ACTIVITY_LOGS = [];

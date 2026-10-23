@@ -90,8 +90,10 @@ export const SessionCollisionModal = ({
           <div className="space-y-2.5 pt-2">
             <button
               onClick={() => {
-                soundFx.playUnlock();
-                onTakeOver();
+                if (confirm("Claiming the active session on this terminal will instantly lock out the other workstation. Do you wish to proceed?")) {
+                  soundFx.playUnlock();
+                  onTakeOver();
+                }
               }}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.3)] transition cursor-pointer"
             >

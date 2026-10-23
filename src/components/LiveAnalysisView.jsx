@@ -47,6 +47,8 @@ export const LiveAnalysisView = ({
   onSimulateCollision,
   onAdminAddTeam,
   onAdminDeleteTeam,
+  onAdminClearAllTeams,
+  onAdminLoadSampleTeams,
   onAdminResetSession,
   onOpenAdminLogin
 }) => {
@@ -579,20 +581,78 @@ export const LiveAnalysisView = ({
 
               {/* Right Column: Roster & Session Management (7 cols) */}
               <div className="lg:col-span-7 p-5 rounded-xl bg-[#15161c] border border-[#252834] flex flex-col">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2 text-xs font-mono font-bold text-white uppercase tracking-wider">
                     <Users className="w-4 h-4 text-cyan-400" />
                     <span>Official Team Roster ({teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length} Teams)</span>
                   </div>
-                  <span className="text-[10px] font-mono text-zinc-400">
-                    Passcode &amp; Session Management
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {onAdminLoadSampleTeams && teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          onAdminLoadSampleTeams();
+                        }}
+                        className="px-2 py-1 rounded bg-[#1b1e2a] hover:bg-[#252a3d] border border-[#303850] text-[#00e5ff] text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
+                        title="Load 10 testing demo teams"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Load Sample Teams</span>
+                      </button>
+                    )}
+
+                    {teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          const exportData = teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut');
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+                          }
+                          if (onBroadcast) onBroadcast('Official Team Roster JSON copied to clipboard!');
+                        }}
+                        className="px-2 py-1 rounded bg-[#171820] hover:bg-[#222432] border border-[#2b2e40] text-zinc-300 hover:text-cyan-300 text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
+                        title="Copy roster JSON to clipboard for easy deployment"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Copy JSON</span>
+                      </button>
+                    )}
+
+                    {onAdminClearAllTeams && teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          if (confirm("Are you sure you want to remove ALL participating teams from the competition? This will clear the roster.")) {
+                            onAdminClearAllTeams();
+                          }
+                        }}
+                        className="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 hover:text-rose-100 text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
+                        title="Delete all participating teams"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Clear All Teams</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2 overflow-y-auto max-h-[340px] pr-1">
-                  {teams
-                    .filter((t) => !t.isAdmin && t.id !== 'admin_vidyut')
-                    .map((t) => {
+                  {teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length === 0 ? (
+                    <div className="p-8 text-center text-zinc-500 font-mono text-xs border border-dashed border-[#20222a] rounded-lg space-y-2">
+                      <Users className="w-6 h-6 text-zinc-600 mx-auto" />
+                      <p className="text-zinc-300 font-bold">No Participating Teams Registered</p>
+                      <p className="text-[11px] text-zinc-500 max-w-sm mx-auto">
+                        Use the Authorize &amp; Provision form on the left to add your official competition teams, or click &quot;Load Sample Teams&quot; above to load test data.
+                      </p>
+                    </div>
+                  ) : (
+                    teams
+                      .filter((t) => !t.isAdmin && t.id !== 'admin_vidyut')
+                      .map((t) => {
                       const activeSession = sessionManager.getActiveSession(t.id);
                       return (
                         <div
@@ -683,7 +743,8 @@ export const LiveAnalysisView = ({
                           </div>
                         </div>
                       );
-                    })}
+                    })
+                  )}
                 </div>
               </div>
             </div>

@@ -386,6 +386,14 @@ export const LeaderboardView = ({
                   </tr>
                 );
               })}
+
+              {filteredTeams.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-zinc-500 font-mono text-xs">
+                    No participating teams registered yet. Teams will be listed once provisioned by contest coordinators.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

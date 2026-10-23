@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PUZZLES } from './data/puzzles';
-import { INITIAL_TEAMS, INITIAL_ACTIVITY_LOGS, ADMIN_TEAM } from './data/teams';
+import { INITIAL_TEAMS, INITIAL_ACTIVITY_LOGS, ADMIN_TEAM, SAMPLE_TEAMS } from './data/teams';
 import { soundFx } from './utils/sound';
 
 import { ElectricCanvas } from './components/ElectricCanvas';
@@ -34,24 +34,35 @@ export const App = () => {
   // Initialize Teams from localStorage with reliable fallback to INITIAL_TEAMS
   const [teams, setTeams] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('vq_teams_data') || localStorage.getItem('vq_prod_teams_v1');
-      if (saved) {
+      const saved = localStorage.getItem('vq_teams_data');
+      if (saved !== null) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             // Filter out legacy dummy demo teams
             const DEMO_IDS = [
               'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
               'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
             ];
-            const clean = parsed.filter((t) => !DEMO_IDS.includes(t.id));
-            if (clean.length > 0) {
-              return clean;
-            }
+            return parsed.filter((t) => !DEMO_IDS.includes(t.id));
           }
         } catch {
           // fallback
         }
+      }
+
+      const legacySaved = localStorage.getItem('vq_prod_teams_v1');
+      if (legacySaved !== null) {
+        try {
+          const parsed = JSON.parse(legacySaved);
+          if (Array.isArray(parsed)) {
+            const DEMO_IDS = [
+              'team_rtl_overclockers', 'team_fpga_phoenix', 'team_silicon_surfers',
+              'team_nand_lords', 'team_gate_crashers', 'team_bitflipper_01', 'team_verilog_vipers'
+            ];
+            return parsed.filter((t) => !DEMO_IDS.includes(t.id));
+          }
+        } catch {}
       }
     }
     return INITIAL_TEAMS;
@@ -69,8 +80,8 @@ export const App = () => {
     // Check if another tab/device is already running an active session for this team
     const activeSession = sessionManager.getActiveSession(saved);
     const myTabSessionId = sessionStorage.getItem('vq_current_session_id');
-    if (activeSession && activeSession.tabId !== sessionManager.tabId && activeSession.sessionId !== myTabSessionId) {
-      // Another tab is active; start in spectator mode to prevent multi-tab collision
+    if (activeSession && (activeSession.tabId !== sessionManager.tabId || activeSession.sessionId !== myTabSessionId)) {
+      // Another tab or device is active; start this tab in spectator mode to prevent multi-tab collision
       return null;
     }
     return saved;
@@ -110,7 +121,9 @@ export const App = () => {
     // Probe client IP & network origin for fraud prevention & admin telemetry
     fetchClientIpData().catch(() => {});
 
-    if (activeTeamId) {
+    // Only refresh session registration if this specific tab holds the active session token
+    const myTabSessionId = sessionStorage.getItem('vq_current_session_id');
+    if (activeTeamId && myTabSessionId) {
       sessionManager.registerSession(activeTeamId);
     }
 
@@ -342,14 +355,36 @@ export const App = () => {
     const teamToDelete = teams.find((t) => t.id === teamId);
     if (!teamToDelete) return;
     sessionManager.releaseSession(teamId);
-    setTeams((prev) => prev.filter((t) => t.id !== teamId));
+    setTeams((prev) => {
+      const next = prev.filter((t) => t.id !== teamId);
+      localStorage.setItem('vq_teams_data', JSON.stringify(next));
+      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(next));
+      return next;
+    });
     showToast(`Team "${teamToDelete.name}" removed from competition.`);
+  };
+
+  // Admin Clear All Teams
+  const handleAdminClearAllTeams = () => {
+    teams.forEach((t) => sessionManager.releaseSession(t.id));
+    setTeams([]);
+    localStorage.setItem('vq_teams_data', JSON.stringify([]));
+    localStorage.setItem('vq_prod_teams_v1', JSON.stringify([]));
+    showToast('All participating teams have been cleared.');
+  };
+
+  // Admin Load Sample Teams (for rehearsal/testing)
+  const handleAdminLoadSampleTeams = () => {
+    setTeams(SAMPLE_TEAMS);
+    localStorage.setItem('vq_teams_data', JSON.stringify(SAMPLE_TEAMS));
+    localStorage.setItem('vq_prod_teams_v1', JSON.stringify(SAMPLE_TEAMS));
+    showToast('Loaded 10 sample testing teams.');
   };
 
   // Admin Reset Session Lock
   const handleAdminResetSession = (teamId) => {
     const team = teams.find((t) => t.id === teamId);
-    sessionManager.releaseSession(teamId);
+    sessionManager.forceResetTeamSession(teamId);
     showToast(`Session lock reset for ${team?.name || 'team'}.`);
   };
 
@@ -560,6 +595,8 @@ export const App = () => {
             onSimulateCollision={handleSimulateExternalCollision}
             onAdminAddTeam={handleAdminAddTeam}
             onAdminDeleteTeam={handleAdminDeleteTeam}
+            onAdminClearAllTeams={handleAdminClearAllTeams}
+            onAdminLoadSampleTeams={handleAdminLoadSampleTeams}
             onAdminResetSession={handleAdminResetSession}
             onOpenAdminLogin={() => {
               setAuthModalMode('admin');

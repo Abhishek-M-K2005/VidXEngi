@@ -9,13 +9,16 @@
  * - Device ID: Unique per browser client/profile (localStorage)
  * - Session ID: Unique token generated per login instance
  * - Real-Time Inter-Tab Sync: BroadcastChannel API + Window Storage Events
+ * - Cross-Device Real-Time Sync: Cloud PubSub Relay (EventSource / SSE)
  * - Heartbeat Verifier: Periodically monitors active token validity
+ * - Immediate Cleanup: beforeunload event listener
  */
 
 const STORAGE_KEY_ACTIVE_SESSION = 'vq_active_session';
 const STORAGE_KEY_TEAM_SESSIONS = 'vq_team_sessions';
 const STORAGE_KEY_DEVICE_ID = 'vq_device_id';
 const CHANNEL_NAME = 'vq_session_integrity_channel';
+const CLOUD_SYNC_URL = 'https://ntfy.sh/vidxengi_vq26_security_stream';
 
 import { getCachedClientIp, getCachedNetworkOrg } from './networkIp';
 
@@ -70,12 +73,16 @@ class SessionManager {
     this.currentTeamId = null;
     this.listeners = new Set();
     this.channel = null;
+    this.eventSource = null;
     this.heartbeatTimer = null;
     this.concurrencyCollisionCount = 0;
+    this.remoteSessions = {};
 
     if (typeof window !== 'undefined') {
       this.initChannel();
+      this.initCloudSync();
       this.initStorageListener();
+      this.initUnloadListener();
       this.startHeartbeat();
     }
   }
@@ -93,6 +100,28 @@ class SessionManager {
     }
   }
 
+  initCloudSync() {
+    try {
+      if (typeof window !== 'undefined' && 'EventSource' in window) {
+        this.eventSource = new EventSource(`${CLOUD_SYNC_URL}/sse`);
+        this.eventSource.onmessage = (event) => {
+          try {
+            if (!event.data) return;
+            const parsed = JSON.parse(event.data);
+            // ntfy wraps message payload inside event.message or directly
+            const payload = parsed.message ? JSON.parse(parsed.message) : parsed;
+            this.handleNetworkMessage(payload);
+          } catch {}
+        };
+        this.eventSource.onerror = () => {
+          // Graceful fallback: local BroadcastChannel continues to enforce single-tab
+        };
+      }
+    } catch (e) {
+      console.warn('[SessionManager] Cloud sync SSE unavailable', e);
+    }
+  }
+
   initStorageListener() {
     window.addEventListener('storage', (e) => {
       if (e.key === STORAGE_KEY_ACTIVE_SESSION || e.key === STORAGE_KEY_TEAM_SESSIONS) {
@@ -101,24 +130,77 @@ class SessionManager {
     });
   }
 
+  initUnloadListener() {
+    window.addEventListener('beforeunload', () => {
+      if (this.currentTeamId && this.currentSessionId) {
+        this.releaseSession(this.currentTeamId);
+      }
+    });
+  }
+
+  broadcastNetwork(data) {
+    try {
+      if (typeof window !== 'undefined' && typeof fetch === 'function') {
+        fetch(CLOUD_SYNC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          mode: 'no-cors'
+        }).catch(() => {});
+      }
+    } catch {}
+  }
+
+  handleNetworkMessage(data) {
+    if (!data || !data.teamId) return;
+
+    if (data.type === 'SESSION_CLAIMED') {
+      // Record remote active session
+      this.remoteSessions[data.teamId] = {
+        ...data,
+        lastHeartbeat: Date.now()
+      };
+
+      // If another terminal claimed OUR active team profile:
+      if (this.currentTeamId && data.teamId === this.currentTeamId) {
+        if (data.deviceId !== this.deviceId || data.sessionId !== this.currentSessionId) {
+          this.concurrencyCollisionCount++;
+          this.notifyTerminated({
+            reason: 'CONCURRENT_LOGIN_DETECTED',
+            bySessionId: data.sessionId,
+            byTabId: data.tabId,
+            byDevice: data.deviceLabel || 'Another Device',
+            timestamp: data.timestamp || Date.now()
+          });
+        }
+      }
+    } else if (data.type === 'SESSION_RELEASED' || data.type === 'SESSION_RESET') {
+      delete this.remoteSessions[data.teamId];
+    } else if (data.type === 'HEARTBEAT') {
+      if (this.remoteSessions[data.teamId]) {
+        this.remoteSessions[data.teamId].lastHeartbeat = Date.now();
+      }
+    }
+  }
+
   handleChannelMessage(data) {
-    if (!data || !this.currentTeamId) return;
+    if (!data) return;
 
     // Another tab/device has claimed the session for our team!
     if (data.type === 'SESSION_CLAIMED' && data.teamId === this.currentTeamId) {
-      // If the incoming session is NOT from this tab
       if (data.tabId !== this.tabId || data.sessionId !== this.currentSessionId) {
         this.concurrencyCollisionCount++;
         this.notifyTerminated({
           reason: 'CONCURRENT_LOGIN_DETECTED',
           bySessionId: data.sessionId,
           byTabId: data.tabId,
-          byDevice: data.deviceLabel || 'Another Browser Tab / Device',
+          byDevice: data.deviceLabel || 'Another Browser Tab',
           timestamp: data.timestamp || Date.now()
         });
       }
+    } else if (data.type === 'SESSION_RELEASED' && data.teamId === this.currentTeamId) {
+      // Local tab released
     } else if (data.type === 'QUERY_ACTIVE_SESSION' && data.teamId === this.currentTeamId) {
-      // Respond that this tab holds the active session
       if (this.currentSessionId && this.channel) {
         this.channel.postMessage({
           type: 'SESSION_ALIVE',
@@ -179,14 +261,23 @@ class SessionManager {
         allSessions[this.currentTeamId].lastHeartbeat = Date.now();
         localStorage.setItem(STORAGE_KEY_TEAM_SESSIONS, JSON.stringify(allSessions));
       }
-    } catch {
-      // Ignore heartbeat storage errors
+    } catch {}
+
+    // Network heartbeat every ~6 seconds
+    if (Math.random() < 0.35) {
+      this.broadcastNetwork({
+        type: 'HEARTBEAT',
+        teamId: this.currentTeamId,
+        sessionId: this.currentSessionId,
+        deviceId: this.deviceId,
+        timestamp: Date.now()
+      });
     }
   }
 
   /**
    * Register a new active login session on this tab.
-   * Displaces any existing active session for this team across all tabs/devices.
+   * Enforces single active session across all tabs and devices.
    */
   registerSession(teamId) {
     const newSessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -224,7 +315,7 @@ class SessionManager {
       console.error('[SessionManager] Failed to update team sessions registry', e);
     }
 
-    // Broadcast CLAIM to displace any other tab immediately
+    // Broadcast CLAIM locally to any other tab immediately
     if (this.channel) {
       this.channel.postMessage({
         type: 'SESSION_CLAIMED',
@@ -232,28 +323,45 @@ class SessionManager {
       });
     }
 
+    // Broadcast CLAIM over network to other devices
+    this.broadcastNetwork({
+      type: 'SESSION_CLAIMED',
+      ...sessionData
+    });
+
     return sessionData;
   }
 
   /**
-   * Query if an active session already exists for this team in another tab/device.
+   * Query if an active session already exists for this team in another tab or device.
    */
   getActiveSession(teamId) {
+    if (!teamId) return null;
+    const now = Date.now();
+
+    // 1. Local session check (inter-tab on this machine)
     try {
       const allSessionsRaw = localStorage.getItem(STORAGE_KEY_TEAM_SESSIONS);
-      if (!allSessionsRaw) return null;
-      const allSessions = JSON.parse(allSessionsRaw);
-      const session = allSessions[teamId];
-      if (!session) return null;
+      if (allSessionsRaw) {
+        const allSessions = JSON.parse(allSessionsRaw);
+        const session = allSessions[teamId];
+        if (session) {
+          // Heartbeat timeout: if inactive for > 15 seconds, consider expired
+          const isAlive = (now - (session.lastHeartbeat || session.loginTime)) < 15000;
+          if (isAlive) return session;
+        }
+      }
+    } catch {}
 
-      // Heartbeat timeout: if inactive for > 15 seconds, consider expired
-      const isAlive = (Date.now() - (session.lastHeartbeat || session.loginTime)) < 15000;
-      if (!isAlive) return null;
-
-      return session;
-    } catch {
-      return null;
+    // 2. Remote session check (cross-device across the network)
+    const remote = this.remoteSessions[teamId];
+    if (remote) {
+      const isAlive = (now - (remote.lastHeartbeat || remote.loginTime || remote.timestamp || 0)) < 25000;
+      if (isAlive) return remote;
+      delete this.remoteSessions[teamId];
     }
+
+    return null;
   }
 
   /**
@@ -270,7 +378,8 @@ class SessionManager {
    * Disconnect / Logout session
    */
   releaseSession(teamId) {
-    if (this.currentTeamId === teamId) {
+    if (this.currentTeamId === teamId || !teamId) {
+      const idToRelease = teamId || this.currentTeamId;
       this.currentTeamId = null;
       this.currentSessionId = null;
       sessionStorage.removeItem('vq_current_session_id');
@@ -280,7 +389,7 @@ class SessionManager {
         const allSessionsRaw = localStorage.getItem(STORAGE_KEY_TEAM_SESSIONS);
         if (allSessionsRaw) {
           const allSessions = JSON.parse(allSessionsRaw);
-          delete allSessions[teamId];
+          delete allSessions[idToRelease];
           localStorage.setItem(STORAGE_KEY_TEAM_SESSIONS, JSON.stringify(allSessions));
         }
       } catch {}
@@ -288,11 +397,49 @@ class SessionManager {
       if (this.channel) {
         this.channel.postMessage({
           type: 'SESSION_RELEASED',
-          teamId,
-          tabId: this.tabId
+          teamId: idToRelease,
+          tabId: this.tabId,
+          deviceId: this.deviceId
         });
       }
+
+      this.broadcastNetwork({
+        type: 'SESSION_RELEASED',
+        teamId: idToRelease,
+        tabId: this.tabId,
+        deviceId: this.deviceId
+      });
     }
+  }
+
+  /**
+   * Admin Force Reset: Clears session locks for a team everywhere
+   */
+  forceResetTeamSession(teamId) {
+    try {
+      const allSessionsRaw = localStorage.getItem(STORAGE_KEY_TEAM_SESSIONS);
+      if (allSessionsRaw) {
+        const allSessions = JSON.parse(allSessionsRaw);
+        delete allSessions[teamId];
+        localStorage.setItem(STORAGE_KEY_TEAM_SESSIONS, JSON.stringify(allSessions));
+      }
+    } catch {}
+
+    delete this.remoteSessions[teamId];
+
+    if (this.channel) {
+      this.channel.postMessage({
+        type: 'SESSION_RESET',
+        teamId,
+        byAdmin: true
+      });
+    }
+
+    this.broadcastNetwork({
+      type: 'SESSION_RESET',
+      teamId,
+      byAdmin: true
+    });
   }
 
   /**

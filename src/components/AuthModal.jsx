@@ -14,7 +14,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 
 export const AuthModal = ({
@@ -22,9 +23,11 @@ export const AuthModal = ({
   onClose,
   teams,
   onLogin,
-  initialMode = 'team'
+  initialMode = 'team',
+  onSyncTeams
 }) => {
   const [mode, setMode] = useState(initialMode);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Participant teams filter (strictly non-admin)
   const participantTeams = teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut');
@@ -323,15 +326,37 @@ export const AuthModal = ({
               )}
 
               {/* Secondary / Dropdown Selection (If teams exist) */}
-              {participantTeams.length > 0 && (
+              {participantTeams.length > 0 ? (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-mono text-zinc-400">
                       Or Select Team Profile
                     </label>
-                    <span className="text-[10px] font-mono text-zinc-500">
-                      {participantTeams.length} competing teams
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {participantTeams.length} competing teams
+                      </span>
+                      {onSyncTeams && (
+                        <button
+                          type="button"
+                          disabled={isSyncing}
+                          onClick={async () => {
+                            soundFx.playClick();
+                            setIsSyncing(true);
+                            try {
+                              await onSyncTeams();
+                            } finally {
+                              setIsSyncing(false);
+                            }
+                          }}
+                          className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/40"
+                          title="Refresh teams from cloud relay"
+                        >
+                          <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                          <span>{isSyncing ? 'Syncing...' : 'Sync Roster'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <select
                     value={selectedTeamId}
@@ -344,6 +369,40 @@ export const AuthModal = ({
                       </option>
                     ))}
                   </select>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-[#12131a] border border-[#232736] text-xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-zinc-300 font-mono text-[11px] font-semibold">
+                      <Users className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Roster Awaiting Cloud Sync</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-amber-400/90 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-800/50">
+                      Empty Slate
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Teams are authorized by ACM Vidyut contest coordinators and broadcast in real time to all contestants on Render.
+                  </p>
+                  {onSyncTeams && (
+                    <button
+                      type="button"
+                      disabled={isSyncing}
+                      onClick={async () => {
+                        soundFx.playClick();
+                        setIsSyncing(true);
+                        try {
+                          await onSyncTeams();
+                        } finally {
+                          setIsSyncing(false);
+                        }
+                      }}
+                      className="w-full py-2 px-3 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-500/40 text-cyan-300 font-mono text-[11px] font-bold flex items-center justify-center gap-2 transition cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.15)]"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-cyan-400' : ''}`} />
+                      <span>{isSyncing ? 'Connecting to Cloud Relay...' : 'Fetch Official Roster from Cloud'}</span>
+                    </button>
+                  )}
                 </div>
               )}
 

@@ -17,6 +17,7 @@ import { SessionCollisionModal } from './components/SessionCollisionModal';
 import { Footer } from './components/Footer';
 import { sessionManager } from './utils/sessionManager';
 import { fetchClientIpData, getCachedClientIp, getCachedNetworkOrg } from './utils/networkIp';
+import { cloudSync } from './utils/cloudSync';
 
 export const App = () => {
   const [currentTab, setCurrentTab] = useState('puzzles');
@@ -138,6 +139,27 @@ export const App = () => {
 
     return () => {
       unsubscribe();
+    };
+  }, []);
+
+  // Real-Time Cloud Team Synchronization across all devices on Render
+  useEffect(() => {
+    // 1. Initial fetch from cloud relay
+    cloudSync.fetchLatestTeams().then((cloudTeams) => {
+      if (Array.isArray(cloudTeams) && cloudTeams.length > 0) {
+        setTeams(cloudTeams);
+      }
+    });
+
+    // 2. Real-time listener for incoming additions/deletions from any admin device
+    const unsubscribeSync = cloudSync.subscribe((incomingTeams) => {
+      if (Array.isArray(incomingTeams)) {
+        setTeams(incomingTeams);
+      }
+    });
+
+    return () => {
+      unsubscribeSync();
     };
   }, []);
 
@@ -331,7 +353,13 @@ export const App = () => {
       ipHistory: []
     };
 
-    setTeams((prev) => [newTeam, ...prev]);
+    setTeams((prev) => {
+      const updated = [newTeam, ...prev];
+      localStorage.setItem('vq_teams_data', JSON.stringify(updated));
+      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(updated));
+      cloudSync.publishTeams(updated);
+      return updated;
+    });
 
     const newEvent = {
       id: `act_${Date.now()}`,
@@ -346,7 +374,7 @@ export const App = () => {
       message: `[ADMIN PROVISIONED]: New team "${newTeam.name}" (${newTeam.college}) authorized.`
     };
     setActivityLogs((prev) => [newEvent, ...prev.slice(0, 30)]);
-    showToast(`Team "${newTeam.name}" successfully provisioned and authorized!`);
+    showToast(`Team "${newTeam.name}" successfully provisioned and synced across all devices!`);
     return newTeam;
   };
 
@@ -359,9 +387,10 @@ export const App = () => {
       const next = prev.filter((t) => t.id !== teamId);
       localStorage.setItem('vq_teams_data', JSON.stringify(next));
       localStorage.setItem('vq_prod_teams_v1', JSON.stringify(next));
+      cloudSync.publishTeams(next);
       return next;
     });
-    showToast(`Team "${teamToDelete.name}" removed from competition.`);
+    showToast(`Team "${teamToDelete.name}" removed and synced.`);
   };
 
   // Admin Clear All Teams
@@ -370,7 +399,8 @@ export const App = () => {
     setTeams([]);
     localStorage.setItem('vq_teams_data', JSON.stringify([]));
     localStorage.setItem('vq_prod_teams_v1', JSON.stringify([]));
-    showToast('All participating teams have been cleared.');
+    cloudSync.publishTeams([]);
+    showToast('All participating teams cleared and synced across devices.');
   };
 
   // Admin Load Sample Teams (for rehearsal/testing)
@@ -378,7 +408,22 @@ export const App = () => {
     setTeams(SAMPLE_TEAMS);
     localStorage.setItem('vq_teams_data', JSON.stringify(SAMPLE_TEAMS));
     localStorage.setItem('vq_prod_teams_v1', JSON.stringify(SAMPLE_TEAMS));
-    showToast('Loaded 10 sample testing teams.');
+    cloudSync.publishTeams(SAMPLE_TEAMS);
+    showToast('Loaded and synced 10 sample testing teams.');
+  };
+
+  // Manual Cloud Sync trigger
+  const handleManualSyncTeams = async () => {
+    showToast('Syncing latest official teams from cloud relay...');
+    const latest = await cloudSync.fetchLatestTeams();
+    if (Array.isArray(latest) && latest.length > 0) {
+      setTeams(latest);
+      localStorage.setItem('vq_teams_data', JSON.stringify(latest));
+      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(latest));
+      showToast(`Roster synchronized! Loaded ${latest.length} team(s).`);
+    } else {
+      showToast('Roster is already synchronized with latest cloud broadcast.');
+    }
   };
 
   // Admin Reset Session Lock
@@ -598,6 +643,7 @@ export const App = () => {
             onAdminClearAllTeams={handleAdminClearAllTeams}
             onAdminLoadSampleTeams={handleAdminLoadSampleTeams}
             onAdminResetSession={handleAdminResetSession}
+            onSyncTeams={handleManualSyncTeams}
             onOpenAdminLogin={() => {
               setAuthModalMode('admin');
               setIsAuthModalOpen(true);
@@ -629,6 +675,7 @@ export const App = () => {
         teams={teams}
         onLogin={handleLoginTeam}
         initialMode={authModalMode}
+        onSyncTeams={handleManualSyncTeams}
       />
 
       {/* Floating Toast Notification - Upgraded to Glassmorphism */}

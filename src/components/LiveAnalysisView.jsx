@@ -50,12 +50,14 @@ export const LiveAnalysisView = ({
   onAdminClearAllTeams,
   onAdminLoadSampleTeams,
   onAdminResetSession,
+  onSyncTeams,
   onOpenAdminLogin
 }) => {
   const [selectedTeamId, setSelectedTeamId] = useState(activeTeam?.id || teams[0]?.id || '');
   const [logFilter, setLogFilter] = useState('ALL');
   const [broadcastText, setBroadcastText] = useState('');
   const [searchTeamQuery, setSearchTeamQuery] = useState('');
+  const [isSyncingRelay, setIsSyncingRelay] = useState(false);
 
   // Admin New Team State
   const [newTeamName, setNewTeamName] = useState('');
@@ -582,11 +584,38 @@ export const LiveAnalysisView = ({
               {/* Right Column: Roster & Session Management (7 cols) */}
               <div className="lg:col-span-7 p-5 rounded-xl bg-[#15161c] border border-[#252834] flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-white uppercase tracking-wider">
-                    <Users className="w-4 h-4 text-cyan-400" />
-                    <span>Official Team Roster ({teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length} Teams)</span>
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-white uppercase tracking-wider flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-cyan-400" />
+                      <span>Official Team Roster ({teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length} Teams)</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Live Cloud Relay</span>
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    {onSyncTeams && (
+                      <button
+                        type="button"
+                        disabled={isSyncingRelay}
+                        onClick={async () => {
+                          soundFx.playClick();
+                          setIsSyncingRelay(true);
+                          try {
+                            await onSyncTeams();
+                          } finally {
+                            setIsSyncingRelay(false);
+                          }
+                        }}
+                        className="px-2 py-1 rounded bg-[#171820] hover:bg-[#222432] border border-[#2b2e40] text-zinc-300 hover:text-cyan-300 text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
+                        title="Pull latest roster broadcast from cloud relay"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isSyncingRelay ? 'animate-spin text-cyan-400' : ''}`} />
+                        <span>{isSyncingRelay ? 'Syncing...' : 'Sync Cloud'}</span>
+                      </button>
+                    )}
+
                     {onAdminLoadSampleTeams && teams.filter((t) => !t.isAdmin && t.id !== 'admin_vidyut').length === 0 && (
                       <button
                         type="button"

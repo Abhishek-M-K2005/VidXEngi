@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Lock,
   Zap,
-  HelpCircle,
   Code2,
   Copy,
   Check,
@@ -237,15 +236,6 @@ export const PuzzleCard = ({
                   </pre>
                 </div>
               )}
-
-              {/* Signal Clue */}
-              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[#14181f] border border-[#222834] text-xs text-zinc-300">
-                <HelpCircle className="w-4 h-4 text-[#00e5ff] shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white">Signal Clue: </strong>
-                  {puzzle.clue}
-                </div>
-              </div>
 
               {/* Hint Drawer */}
               <div>

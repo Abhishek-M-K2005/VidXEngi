@@ -10,17 +10,14 @@ export const PUZZLES = [
     puzzleStatement: "You have three independent 1-bit error flags: err1, err2, and err3. Write the combinational logic to output a 2-bit error_count showing exactly how many flags are high.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Stage 01: Multi-Flag Error Accumulator
-module error_accumulator (
+      code: `module error_accumulator (
     input  wire err1, err2, err3,
     output wire [1:0] error_count
 );
-    // Write the continuous assignment to count active high flags:
-    assign error_count = /* COMBINATIONAL ADDER LOGIC */;
+
 endmodule`
     },
-    clue: "In Verilog, 1-bit signals can be directly summed using the addition operator `+`. Summing three 1-bit signals produces a result from 0 to 3, perfectly fitting a 2-bit wire.",
-    hint: "Use continuous assignment: assign error_count = err1 + err2 + err3;",
+    hint: "In Verilog, 1-bit signals can be directly summed using the addition operator `+`. Summing three 1-bit signals produces a result from 0 to 3, perfectly fitting a 2-bit wire.",
     hintPenaltyMinutes: 5,
     acceptedAnswers: [
       "assign error_count = err1 + err2 + err3;",
@@ -57,20 +54,17 @@ endmodule`
     puzzleStatement: "A 2-bit symbol sym_in arrives every clock cycle. You need to output a 4-bit history bus that always holds the previous symbol and the symbol before that, side-by-side.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Stage 02: 2-Stage Symbol Pipeline History Buffer
-module symbol_tracker (
+      code: `module symbol_tracker (
     input  wire       clk,
     input  wire [1:0] sym_in,
     output reg  [3:0] history
 );
-    // Shift incoming 2-bit symbol into the 4-bit history register:
     always @(posedge clk) begin
-        history <= /* CONCATENATION SHIFT EXPRESSION */;
+
     end
 endmodule`
     },
-    clue: "Use Verilog concatenation `{}` inside a clocked procedural block: shift the current lower 2 bits of history alongside the incoming `sym_in`.",
-    hint: "always @(posedge clk) history <= {history[1:0], sym_in};",
+    hint: "Use Verilog concatenation `{}` inside a clocked procedural block: shift the current lower 2 bits of history alongside the incoming `sym_in`.",
     hintPenaltyMinutes: 5,
     acceptedAnswers: [
       "always @(posedge clk) history <= {history[1:0], sym_in};",
@@ -108,17 +102,14 @@ endmodule`
     puzzleStatement: "You have an 8-bit bus data_in. Write a continuous assignment that outputs data_out where the middle 4 bits (bits 5 down to 2) are replaced with 4'b1111, but the outer bits are left untouched.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Stage 03: Middle-Bit Mask Injection Engine
-module mask_replace (
+      code: `module mask_replace (
     input  wire [7:0] data_in,
     output wire [7:0] data_out
 );
-    // Replace bits [5:2] with 4'b1111, preserving bits [7:6] and [1:0]:
-    assign data_out = /* CONCATENATION REPLACEMENT */;
+
 endmodule`
     },
-    clue: "Split `data_in` using bus slicing: take upper bits `data_in[7:6]`, concatenate literal `4'b1111`, and concatenate lower bits `data_in[1:0]` inside `{}`.",
-    hint: "assign data_out = {data_in[7:6], 4'b1111, data_in[1:0]};",
+    hint: "Split `data_in` using bus slicing: take upper bits `data_in[7:6]`, concatenate literal `4'b1111`, and concatenate lower bits `data_in[1:0]` inside `{}`.",
     hintPenaltyMinutes: 5,
     acceptedAnswers: [
       "assign data_out = {data_in[7:6], 4'b1111, data_in[1:0]};",
@@ -157,18 +148,17 @@ always @(posedge clk) if (start) flag <= 1;
 always @(posedge clk) if (stop)  flag <= 0;`,
     hardwareSnippet: {
       language: "verilog",
-      code: `// Stage 04: Multiple-Driver Elimination
-// BUGGY SYNTHESIS ATTEMPT:
-//   always @(posedge clk) if (start) flag <= 1;
-//   always @(posedge clk) if (stop)  flag <= 0; // Fatal: multi-driven register!
-
-// Provide the single unified always block with proper priority logic:
-always @(posedge clk) begin
-    /* UNIFIED CONDITIONAL PRIORITY LOGIC */
-end`
+      code: `module flag_controller (
+    input  wire clk,
+    input  wire start,
+    input  wire stop,
+    output reg  flag
+);
+    always @(posedge clk) if (start) flag <= 1;
+    always @(posedge clk) if (stop)  flag <= 0;
+endmodule`
     },
-    clue: "In hardware, a register can only be assigned within a SINGLE procedural `always` block. Unify the two conditions into one block using `if ... else if ...`.",
-    hint: "always @(posedge clk) if (stop) flag <= 0; else if (start) flag <= 1;",
+    hint: "In hardware, a register can only be assigned within a SINGLE procedural `always` block. Unify the two conditions into one block using `if ... else if ...`.",
     hintPenaltyMinutes: 8,
     acceptedAnswers: [
       "always @(posedge clk) if (stop) flag <= 0; else if (start) flag <= 1;",
@@ -208,8 +198,7 @@ end`
     puzzleStatement: "A module takes data_in and spits out data_out exactly one clock cycle later. Assert an error flag if data_out does not match the original data_in.",
     hardwareSnippet: {
       language: "verilog",
-      code: `// Stage 05: 1-Cycle Pipeline Verification Monitor
-module latency_checker (
+      code: `module latency_checker (
     input  wire clk,
     input  wire [7:0] data_in,
     input  wire [7:0] data_out,
@@ -217,13 +206,10 @@ module latency_checker (
 );
     reg [7:0] dly_reg;
 
-    // Register data_in by one clock cycle, then assert error if mismatch:
     always @(posedge clk) dly_reg <= data_in;
-    assign error = /* INEQUALITY COMPARISON */;
 endmodule`
     },
-    clue: "Store `data_in` on `posedge clk` in an intermediate register (`dly_reg <= data_in;`), and continuously assert `error` when `data_out` is not equal to `dly_reg` (`data_out != dly_reg`).",
-    hint: "always @(posedge clk) dly_reg <= data_in;\nassign error = (data_out != dly_reg);",
+    hint: "Store `data_in` on `posedge clk` in an intermediate register (`dly_reg <= data_in;`), and continuously assert `error` when `data_out` is not equal to `dly_reg` (`data_out != dly_reg`).",
     hintPenaltyMinutes: 8,
     acceptedAnswers: [
       "always @(posedge clk) dly_reg <= data_in; assign error = (data_out != dly_reg);",

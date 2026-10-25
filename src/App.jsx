@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PUZZLES } from './data/puzzles';
 import { INITIAL_TEAMS, INITIAL_ACTIVITY_LOGS, ADMIN_TEAM, SAMPLE_TEAMS } from './data/teams';
 import { soundFx } from './utils/sound';
@@ -415,9 +415,23 @@ export const App = () => {
 
   // Admin Provision New Team (Only callable by Admin)
   const handleAdminAddTeam = (newTeamData) => {
+    const cleanName = (newTeamData.name || '').trim();
+    if (!cleanName) return null;
+
+    // Enforce strictly unique team names
+    const exists = teams.some(
+      (t) => t.name && t.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    if (exists) {
+      soundFx.playError();
+      showToast(`Cannot create team: "${cleanName}" already exists!`);
+      return null;
+    }
+
     const newId = `team_${Date.now()}`;
     const newTeam = {
       ...newTeamData,
+      name: cleanName,
       id: newId,
       solvedPuzzles: [],
       puzzleSolveTimestamps: {},
@@ -488,19 +502,21 @@ export const App = () => {
   };
 
   // Manual Cloud Sync trigger
-  const handleManualSyncTeams = async () => {
+  const handleManualSyncTeams = useCallback(async () => {
     showToast('Syncing latest official teams from cloud relay...');
     const latest = await cloudSync.fetchLatestTeams();
-    if (Array.isArray(latest)) {
-      const clean = normalizeTeams(latest);
-      setTeams(clean);
-      localStorage.setItem('vq_teams_data', JSON.stringify(clean));
-      localStorage.setItem('vq_prod_teams_v1', JSON.stringify(clean));
-      showToast(`Roster synchronized! Loaded ${clean.length} team(s).`);
+    if (Array.isArray(latest) && latest.length > 0) {
+      setTeams((prev) => {
+        const merged = mergeTeams(prev, latest);
+        localStorage.setItem('vq_teams_data', JSON.stringify(merged));
+        localStorage.setItem('vq_prod_teams_v1', JSON.stringify(merged));
+        return merged;
+      });
+      showToast(`Roster synchronized! Loaded ${latest.length} team(s).`);
     } else {
       showToast('Roster is already synchronized with latest cloud broadcast.');
     }
-  };
+  }, []);
 
   // Admin Reset Session Lock
   const handleAdminResetSession = (teamId) => {

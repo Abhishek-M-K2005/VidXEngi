@@ -43,17 +43,17 @@ export const AuthModal = ({
   const [adminError, setAdminError] = useState('');
   const [showAdminPass, setShowAdminPass] = useState(false);
 
-  // Sync mode whenever initialMode changes or modal opens
+  // Track modal open state to only initialize mode on initial open (never reset during active session)
+  const prevIsOpenRef = React.useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setMode(initialMode || 'team');
       setLoginError('');
       setAdminError('');
-      if (typeof onSyncTeams === 'function') {
-        onSyncTeams().catch(() => {});
-      }
     }
-  }, [isOpen, initialMode, onSyncTeams]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialMode]);
 
   // Keep selectedTeamId synced with available teams
   useEffect(() => {

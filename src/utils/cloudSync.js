@@ -50,18 +50,45 @@ export const compactTeam = (t) => {
   return c;
 };
 
+export const deduplicateTeamsByName = (teams) => {
+  if (!Array.isArray(teams)) return [];
+  const nameSeen = new Map();
+  const deduplicated = [];
+  for (const t of teams) {
+    if (!t) continue;
+    const normName = (t.name || '').trim().toLowerCase();
+    if (!normName) {
+      deduplicated.push(t);
+      continue;
+    }
+    if (nameSeen.has(normName)) {
+      const existing = nameSeen.get(normName);
+      existing.solvedPuzzles = Array.from(new Set([...(existing.solvedPuzzles || []), ...(t.solvedPuzzles || [])])).sort((a, b) => a - b);
+      existing.score = Math.max(existing.score || 0, t.score || 0);
+      existing.penaltyMinutes = Math.max(existing.penaltyMinutes || 0, t.penaltyMinutes || 0);
+      existing.puzzleSolveTimestamps = { ...(existing.puzzleSolveTimestamps || {}), ...(t.puzzleSolveTimestamps || {}) };
+      existing.lastActive = Math.max(existing.lastActive || 0, t.lastActive || 0);
+    } else {
+      nameSeen.set(normName, t);
+      deduplicated.push(t);
+    }
+  }
+  return deduplicated;
+};
+
 export const normalizeTeams = (teams) => {
   if (!Array.isArray(teams)) return [];
-  return teams.map(normalizeTeam).filter(Boolean);
+  const normalized = teams.map(normalizeTeam).filter(Boolean);
+  return deduplicateTeamsByName(normalized);
 };
 
 export const mergeTeams = (localTeams, incomingTeams, source = 'SYNC') => {
   if (!Array.isArray(incomingTeams) || incomingTeams.length === 0) {
     if (source === 'ADMIN_CLEAR') return [];
-    return localTeams || [];
+    return deduplicateTeamsByName(localTeams || []);
   }
   if (!Array.isArray(localTeams) || localTeams.length === 0) {
-    return incomingTeams;
+    return deduplicateTeamsByName(incomingTeams);
   }
 
   // 1. Strict Authoritative Deletions: Only explicit ADMIN_CLEAR or ADMIN_DELETE can reduce the roster
@@ -69,7 +96,7 @@ export const mergeTeams = (localTeams, incomingTeams, source = 'SYNC') => {
     return [];
   }
   if (source === 'ADMIN_DELETE') {
-    return incomingTeams;
+    return deduplicateTeamsByName(incomingTeams);
   }
 
   // 2. Full Union Merge: For all other events (TEAM_SOLVE, TEAM_HINT, ADMIN_PROVISION, SYNC, INITIAL_FETCH),
@@ -134,7 +161,8 @@ export const mergeTeams = (localTeams, incomingTeams, source = 'SYNC') => {
     });
   }
 
-  return merged;
+  // Enforce global uniqueness across all merged records
+  return deduplicateTeamsByName(merged);
 };
 
 class CloudSyncManager {

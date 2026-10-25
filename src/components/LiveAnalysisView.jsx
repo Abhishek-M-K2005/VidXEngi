@@ -65,16 +65,28 @@ export const LiveAnalysisView = ({
   const [newTeamMembers, setNewTeamMembers] = useState('');
   const [newTeamPasscode, setNewTeamPasscode] = useState('');
   const [newTeamAvatar, setNewTeamAvatar] = useState('CORE');
-  const [showPasscodes, setShowPasscodes] = useState(false);
+  const [showPasscodes, setShowPasscodes] = useState(true);
+
+  const isNameDuplicate = Boolean(
+    newTeamName.trim() && 
+    teams.some((t) => t.name && t.name.trim().toLowerCase() === newTeamName.trim().toLowerCase())
+  );
 
   const handleCreateTeamSubmit = (e) => {
     e.preventDefault();
-    if (!newTeamName.trim() || !newTeamPasscode.trim()) return;
+    const cleanName = newTeamName.trim();
+    if (!cleanName || !newTeamPasscode.trim()) return;
+
+    if (isNameDuplicate) {
+      soundFx.playError();
+      alert(`Team name "${cleanName}" already exists! Team names must be unique.`);
+      return;
+    }
 
     soundFx.playVictory();
     if (onAdminAddTeam) {
       onAdminAddTeam({
-        name: newTeamName.trim(),
+        name: cleanName,
         college: newTeamCollege.trim() || 'NITK Surathkal',
         members: newTeamMembers.split(',').map((m) => m.trim()).filter(Boolean),
         passcode: newTeamPasscode.trim(),
@@ -506,15 +518,28 @@ export const LiveAnalysisView = ({
 
                 <form onSubmit={handleCreateTeamSubmit} className="space-y-3.5 text-xs">
                   <div>
-                    <label className="block text-zinc-400 font-mono mb-1">Team Name *</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-zinc-400 font-mono">Team Name *</label>
+                      <span className="text-[10px] font-mono text-zinc-500">Must be unique</span>
+                    </div>
                     <input
                       type="text"
                       required
                       value={newTeamName}
                       onChange={(e) => setNewTeamName(e.target.value)}
                       placeholder="e.g. QuantumCircuits_NITK"
-                      className="w-full px-3 py-2 rounded-lg bg-[#0c0d10] border border-[#2a2d3a] text-white font-mono focus:outline-none focus:border-amber-400 transition"
+                      className={`w-full px-3 py-2 rounded-lg bg-[#0c0d10] border text-white font-mono focus:outline-none transition ${
+                        isNameDuplicate
+                          ? 'border-rose-500/80 focus:border-rose-400'
+                          : 'border-[#2a2d3a] focus:border-amber-400'
+                      }`}
                     />
+                    {isNameDuplicate && (
+                      <span className="text-rose-400 text-[11px] font-mono mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
+                        <span>A team with this name already exists!</span>
+                      </span>
+                    )}
                   </div>
 
                   <div>
@@ -574,7 +599,12 @@ export const LiveAnalysisView = ({
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-mono font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.25)] transition cursor-pointer"
+                    disabled={isNameDuplicate}
+                    className={`w-full py-2.5 px-4 rounded-xl text-black font-mono font-bold uppercase tracking-wider text-xs flex items-center justify-center gap-2 transition ${
+                      isNameDuplicate
+                        ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.25)] cursor-pointer'
+                    }`}
                   >
                     <Plus className="w-4 h-4" />
                     <span>Authorize &amp; Provision Team</span>
@@ -697,11 +727,12 @@ export const LiveAnalysisView = ({
                                 ({t.college})
                               </span>
                             </div>
-                            <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+                            <div className="text-[11px] text-zinc-400 flex items-center gap-2 flex-wrap">
                               <span>Members: {t.members?.join(', ') || 'Unassigned'}</span>
                               <span>&bull;</span>
-                              <span className="font-mono text-amber-300">
-                                Passcode: {showPasscodes ? (t.passcode || 'none') : '••••••'}
+                              <span className="font-mono text-amber-300 font-bold bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/50 flex items-center gap-1.5 select-all" title="Team Passkey (Click to select & copy)">
+                                <KeyRound className="w-3 h-3 text-amber-400" />
+                                <span>Passkey: {showPasscodes ? (t.passcode || 'none') : '••••••'}</span>
                               </span>
                             </div>
                             <div className="text-[10px] font-mono text-zinc-500 space-y-1 pt-0.5">

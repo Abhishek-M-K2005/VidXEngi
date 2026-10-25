@@ -56,56 +56,83 @@ export const normalizeTeams = (teams) => {
 };
 
 export const mergeTeams = (localTeams, incomingTeams, source = 'SYNC') => {
-  if (!Array.isArray(incomingTeams)) return localTeams || [];
-  if (!Array.isArray(localTeams) || localTeams.length === 0) return incomingTeams;
-
-  // If Admin explicitly altered the roster structure, use the authoritative roster
-  if (source === 'ADMIN_CLEAR' || source === 'ADMIN_DELETE' || source === 'ADMIN_PROVISION') {
+  if (!Array.isArray(incomingTeams) || incomingTeams.length === 0) {
+    if (source === 'ADMIN_CLEAR') return [];
+    return localTeams || [];
+  }
+  if (!Array.isArray(localTeams) || localTeams.length === 0) {
     return incomingTeams;
   }
 
-  // Progress/Solve sync: merge progress so no device loses its own solves
+  // 1. Strict Authoritative Deletions: Only explicit ADMIN_CLEAR or ADMIN_DELETE can reduce the roster
+  if (source === 'ADMIN_CLEAR') {
+    return [];
+  }
+  if (source === 'ADMIN_DELETE') {
+    return incomingTeams;
+  }
+
+  // 2. Full Union Merge: For all other events (TEAM_SOLVE, TEAM_HINT, ADMIN_PROVISION, SYNC, INITIAL_FETCH),
+  // NEVER drop any team! If a client with 12 teams sends a solve, the other 11 teams locally MUST be preserved!
   const localMap = new Map(localTeams.map((t) => [t.id, t]));
+  const incomingMap = new Map(incomingTeams.map((t) => [t.id, t]));
+  const allIds = new Set([...localMap.keys(), ...incomingMap.keys()]);
+  const merged = [];
 
-  const merged = incomingTeams.map((inTeam) => {
-    const loc = localMap.get(inTeam.id);
-    if (!loc) return inTeam;
+  for (const id of allIds) {
+    const loc = localMap.get(id);
+    const inc = incomingMap.get(id);
 
+    if (loc && !inc) {
+      // Team exists locally but missing in incoming message -> KEEP IT!
+      merged.push(loc);
+      continue;
+    }
+
+    if (!loc && inc) {
+      // New team from peer or admin -> ADD IT!
+      merged.push(inc);
+      continue;
+    }
+
+    // Team exists in both: merge progress, scores, timestamps safely
     const locSolved = Array.isArray(loc.solvedPuzzles) ? loc.solvedPuzzles : [];
-    const inSolved = Array.isArray(inTeam.solvedPuzzles) ? inTeam.solvedPuzzles : [];
-    const combinedSolved = Array.from(new Set([...locSolved, ...inSolved])).sort((a, b) => a - b);
+    const incSolved = Array.isArray(inc.solvedPuzzles) ? inc.solvedPuzzles : [];
+    const combinedSolved = Array.from(new Set([...locSolved, ...incSolved])).sort((a, b) => a - b);
 
     const combinedTimestamps = {
       ...(loc.puzzleSolveTimestamps || {}),
-      ...(inTeam.puzzleSolveTimestamps || {})
+      ...(inc.puzzleSolveTimestamps || {})
     };
 
     let completedAllAt = null;
     if (combinedSolved.length === 5) {
-      const candidates = [loc.completedAllAt, inTeam.completedAllAt].filter(Boolean);
-      if (candidates.length > 0) {
-        completedAllAt = Math.min(...candidates);
-      } else {
-        completedAllAt = Date.now();
-      }
+      const candidates = [loc.completedAllAt, inc.completedAllAt].filter(Boolean);
+      completedAllAt = candidates.length > 0 ? Math.min(...candidates) : Date.now();
     }
 
-    const maxScore = Math.max(loc.score || 0, inTeam.score || 0);
-    const maxPenalty = Math.max(loc.penaltyMinutes || 0, inTeam.penaltyMinutes || 0);
+    const maxScore = Math.max(loc.score || 0, inc.score || 0);
+    const maxPenalty = Math.max(loc.penaltyMinutes || 0, inc.penaltyMinutes || 0);
 
-    return {
-      ...inTeam,
-      name: inTeam.name || loc.name,
-      college: inTeam.college || loc.college,
-      passcode: inTeam.passcode || loc.passcode,
+    merged.push({
+      ...inc,
+      name: inc.name || loc.name,
+      callsign: inc.callsign || loc.callsign || inc.name || loc.name,
+      college: inc.college || loc.college,
+      passcode: inc.passcode || loc.passcode,
+      members: (inc.members && inc.members.length > 0) ? inc.members : (loc.members || []),
+      avatarSeed: inc.avatarSeed || loc.avatarSeed || 'CORE',
       solvedPuzzles: combinedSolved,
       puzzleSolveTimestamps: combinedTimestamps,
       score: maxScore,
       penaltyMinutes: maxPenalty,
-      completedAllAt: completedAllAt || inTeam.completedAllAt || loc.completedAllAt,
-      lastActive: Math.max(loc.lastActive || 0, inTeam.lastActive || 0)
-    };
-  });
+      completedAllAt: completedAllAt || inc.completedAllAt || loc.completedAllAt,
+      lastActive: Math.max(loc.lastActive || 0, inc.lastActive || 0),
+      lastIp: inc.lastIp || loc.lastIp,
+      networkOrg: inc.networkOrg || loc.networkOrg,
+      ipHistory: Array.from(new Set([...(loc.ipHistory || []), ...(inc.ipHistory || [])]))
+    });
+  }
 
   return merged;
 };
@@ -215,7 +242,10 @@ class CloudSyncManager {
 
       // ntfy /json returns newline-delimited JSON messages (JSON Lines)
       const lines = text.trim().split('\n').filter(Boolean);
-      // Process newest messages first
+      let aggregatedTeams = [];
+      let scanned = 0;
+
+      // Process newest messages backwards and union them so outdated messages never mask the roster
       for (let i = lines.length - 1; i >= 0; i--) {
         try {
           const item = JSON.parse(lines[i]);
@@ -223,13 +253,35 @@ class CloudSyncManager {
 
           if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
             const cleanTeams = normalizeTeams(body.teams);
-            this.lastSyncTimestamp = body.timestamp || Date.now();
-            this.lastTeamsHash = this.getTeamsSignature(cleanTeams);
-            return cleanTeams;
+            scanned++;
+
+            // Explicit Admin clear stops backward merge
+            if (body.source === 'ADMIN_CLEAR') {
+              aggregatedTeams = [];
+              break;
+            }
+            if (body.source === 'ADMIN_DELETE') {
+              aggregatedTeams = cleanTeams;
+              break;
+            }
+
+            // Union merge with aggregated snapshot
+            aggregatedTeams = mergeTeams(aggregatedTeams, cleanTeams, body.source);
+
+            // Once we have processed the latest authoritative snapshots, stop
+            if (scanned >= 10 && aggregatedTeams.length > 0) {
+              break;
+            }
           }
         } catch {
           // ignore corrupted lines
         }
+      }
+
+      if (aggregatedTeams.length > 0) {
+        this.lastSyncTimestamp = Date.now();
+        this.lastTeamsHash = this.getTeamsSignature(aggregatedTeams);
+        return aggregatedTeams;
       }
     } catch (err) {
       console.warn('[CloudSync] Fetching cloud teams failed, using local storage cache:', err);

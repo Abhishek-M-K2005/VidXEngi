@@ -49,8 +49,11 @@ export const AuthModal = ({
       setMode(initialMode || 'team');
       setLoginError('');
       setAdminError('');
+      if (typeof onSyncTeams === 'function') {
+        onSyncTeams().catch(() => {});
+      }
     }
-  }, [isOpen, initialMode]);
+  }, [isOpen, initialMode, onSyncTeams]);
 
   // Keep selectedTeamId synced with available teams
   useEffect(() => {
@@ -333,8 +336,9 @@ export const AuthModal = ({
                       Or Select Team Profile
                     </label>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        {participantTeams.length} competing teams
+                      <span className="text-[10px] font-mono text-emerald-400/90 flex items-center gap-1.5 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Auto-Sync ({participantTeams.length} teams)</span>
                       </span>
                       {onSyncTeams && (
                         <button
@@ -350,10 +354,10 @@ export const AuthModal = ({
                             }
                           }}
                           className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer transition px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/40"
-                          title="Refresh teams from cloud relay"
+                          title="Force refresh teams from cloud relay"
                         >
                           <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                          <span>{isSyncing ? 'Syncing...' : 'Sync Roster'}</span>
+                          <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
                         </button>
                       )}
                     </div>

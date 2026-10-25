@@ -187,8 +187,30 @@ export const App = () => {
       }
     });
 
+    // 3. Continuous Background Auto-Sync (Runs every 5 seconds)
+    // Ensures real-time consistency on mobile, sleeping tabs, or network reconnection
+    const autoSyncInterval = setInterval(async () => {
+      try {
+        const cloudTeams = await cloudSync.fetchLatestTeams();
+        if (Array.isArray(cloudTeams) && cloudTeams.length > 0) {
+          setTeams((prev) => {
+            const merged = mergeTeams(prev, cloudTeams);
+            if (cloudSync.getTeamsSignature(merged) !== cloudSync.getTeamsSignature(prev)) {
+              localStorage.setItem('vq_teams_data', JSON.stringify(merged));
+              localStorage.setItem('vq_prod_teams_v1', JSON.stringify(merged));
+              return merged;
+            }
+            return prev;
+          });
+        }
+      } catch {
+        // quiet fallback
+      }
+    }, 5000);
+
     return () => {
       unsubscribeSync();
+      clearInterval(autoSyncInterval);
     };
   }, [activeTeamId]);
 
@@ -295,7 +317,7 @@ export const App = () => {
         const next = prev.map((t) => (t.id === activeTeam.id ? updatedTeam : t));
         localStorage.setItem('vq_teams_data', JSON.stringify(next));
         localStorage.setItem('vq_prod_teams_v1', JSON.stringify(next));
-        cloudSync.publishTeams(next, {
+        cloudSync.publishTeams([updatedTeam], {
           source: 'TEAM_SOLVE',
           teamId: activeTeam.id,
           teamName: activeTeam.name,

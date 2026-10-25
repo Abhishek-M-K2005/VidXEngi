@@ -12,23 +12,42 @@ export const normalizeTeam = (t) => {
   if (!t || typeof t !== 'object') return null;
   return {
     id: t.id || `team_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    name: t.name || 'Team Profile',
-    callsign: t.callsign || t.name || 'T00',
-    college: t.college || 'Engineering Institute',
-    members: Array.isArray(t.members) ? t.members : [],
-    passcode: t.passcode ? String(t.passcode) : '',
-    solvedPuzzles: Array.isArray(t.solvedPuzzles) ? t.solvedPuzzles : [],
-    puzzleSolveTimestamps: (t.puzzleSolveTimestamps && typeof t.puzzleSolveTimestamps === 'object') ? t.puzzleSolveTimestamps : {},
-    penaltyMinutes: typeof t.penaltyMinutes === 'number' ? t.penaltyMinutes : 0,
-    score: typeof t.score === 'number' ? t.score : 0,
-    avatarSeed: t.avatarSeed || 'CORE',
+    name: t.name || t.n || 'Team Profile',
+    callsign: t.callsign || t.c || t.name || t.n || 'T00',
+    college: t.college || t.col || 'Engineering Institute',
+    members: Array.isArray(t.members || t.m) ? (t.members || t.m) : [],
+    passcode: t.passcode ? String(t.passcode) : (t.p ? String(t.p) : ''),
+    solvedPuzzles: Array.isArray(t.solvedPuzzles || t.s) ? (t.solvedPuzzles || t.s) : [],
+    puzzleSolveTimestamps: (t.puzzleSolveTimestamps || t.ts) && typeof (t.puzzleSolveTimestamps || t.ts) === 'object' ? (t.puzzleSolveTimestamps || t.ts) : {},
+    penaltyMinutes: typeof (t.penaltyMinutes ?? t.pen) === 'number' ? (t.penaltyMinutes ?? t.pen) : 0,
+    score: typeof (t.score ?? t.sc) === 'number' ? (t.score ?? t.sc) : 0,
+    avatarSeed: t.avatarSeed || t.a || 'CORE',
     lastActive: typeof t.lastActive === 'number' ? t.lastActive : Date.now(),
-    completedAllAt: t.completedAllAt || null,
+    completedAllAt: t.completedAllAt || t.fin || null,
     lastIp: t.lastIp || null,
     networkOrg: t.networkOrg || null,
     ipHistory: Array.isArray(t.ipHistory) ? t.ipHistory : [],
     isAdmin: Boolean(t.isAdmin)
   };
+};
+
+export const compactTeam = (t) => {
+  if (!t || typeof t !== 'object') return null;
+  const c = {
+    id: t.id,
+    n: t.name,
+    c: t.callsign || t.name,
+    col: t.college,
+    p: t.passcode,
+    a: t.avatarSeed || 'CORE'
+  };
+  if (Array.isArray(t.members) && t.members.length > 0) c.m = t.members;
+  if (Array.isArray(t.solvedPuzzles) && t.solvedPuzzles.length > 0) c.s = t.solvedPuzzles;
+  if (t.puzzleSolveTimestamps && Object.keys(t.puzzleSolveTimestamps).length > 0) c.ts = t.puzzleSolveTimestamps;
+  if (t.penaltyMinutes) c.pen = t.penaltyMinutes;
+  if (t.score) c.sc = t.score;
+  if (t.completedAllAt) c.fin = t.completedAllAt;
+  return c;
 };
 
 export const normalizeTeams = (teams) => {
@@ -111,10 +130,40 @@ class CloudSyncManager {
   }
 
   /**
+   * Helper to parse payload from either inline JSON message or ntfy attachment
+   */
+  async parseItemBody(item) {
+    if (!item) return null;
+    // 1. If payload was > 4KB, ntfy converts it to an attachment URL
+    if (item.attachment && item.attachment.url) {
+      try {
+        const fileRes = await fetch(item.attachment.url, { cache: 'no-cache' });
+        if (fileRes.ok) {
+          const data = await fileRes.json();
+          return data;
+        }
+      } catch (err) {
+        console.warn('[CloudSync] Failed to fetch attachment payload:', err);
+      }
+    }
+    // 2. Otherwise parse inline JSON message
+    if (item.message && typeof item.message === 'string') {
+      try {
+        return JSON.parse(item.message);
+      } catch {
+        // Plain text notification or non-JSON
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Publish updated teams to the cloud so all other devices receive them
    */
   async publishTeams(teams, metadata = {}) {
     const cleanTeams = normalizeTeams(teams);
+    const compactTeams = cleanTeams.map(compactTeam).filter(Boolean);
     const now = Date.now();
     this.lastSyncTimestamp = now;
     this.lastTeamsHash = this.getTeamsSignature(cleanTeams);
@@ -129,7 +178,7 @@ class CloudSyncManager {
       points: metadata.points || null,
       isAllSolved: Boolean(metadata.isAllSolved),
       timestamp: now,
-      teams: cleanTeams
+      teams: compactTeams
     };
 
     try {
@@ -170,14 +219,13 @@ class CloudSyncManager {
       for (let i = lines.length - 1; i >= 0; i--) {
         try {
           const item = JSON.parse(lines[i]);
-          if (item && item.message) {
-            const body = JSON.parse(item.message);
-            if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
-              const cleanTeams = normalizeTeams(body.teams);
-              this.lastSyncTimestamp = body.timestamp || Date.now();
-              this.lastTeamsHash = this.getTeamsSignature(cleanTeams);
-              return cleanTeams;
-            }
+          const body = await this.parseItemBody(item);
+
+          if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
+            const cleanTeams = normalizeTeams(body.teams);
+            this.lastSyncTimestamp = body.timestamp || Date.now();
+            this.lastTeamsHash = this.getTeamsSignature(cleanTeams);
+            return cleanTeams;
           }
         } catch {
           // ignore corrupted lines
@@ -203,27 +251,26 @@ class CloudSyncManager {
           this.isConnected = true;
         };
 
-        this.eventSource.onmessage = (event) => {
+        this.eventSource.onmessage = async (event) => {
           try {
             if (!event.data) return;
             const item = JSON.parse(event.data);
-            if (item && item.message) {
-              const body = JSON.parse(item.message);
-              if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
-                const incomingClean = normalizeTeams(body.teams);
-                const incomingHash = this.getTeamsSignature(incomingClean);
-                // Avoid redundant updates if hash matches what we already published
-                if (incomingHash !== this.lastTeamsHash) {
-                  this.lastTeamsHash = incomingHash;
-                  this.lastSyncTimestamp = body.timestamp || Date.now();
-                  this.listeners.forEach((callback) => {
-                    try {
-                      callback(incomingClean, body);
-                    } catch (e) {
-                      console.error('[CloudSync] Listener error:', e);
-                    }
-                  });
-                }
+            const body = await this.parseItemBody(item);
+
+            if (body && body.type === 'TEAMS_UPDATE' && Array.isArray(body.teams)) {
+              const incomingClean = normalizeTeams(body.teams);
+              const incomingHash = this.getTeamsSignature(incomingClean);
+              // Avoid redundant updates if hash matches what we already published
+              if (incomingHash !== this.lastTeamsHash) {
+                this.lastTeamsHash = incomingHash;
+                this.lastSyncTimestamp = body.timestamp || Date.now();
+                this.listeners.forEach((callback) => {
+                  try {
+                    callback(incomingClean, body);
+                  } catch (e) {
+                    console.error('[CloudSync] Listener error:', e);
+                  }
+                });
               }
             }
           } catch {
